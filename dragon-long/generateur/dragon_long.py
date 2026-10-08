@@ -1,6 +1,9 @@
 # Dragon Long (dragon chinois) stylisé, low-poly.
 # v1 : premier croquis. v2 : écailles en relief sur le dos, plaques sur le ventre, crête plus fournie, yeux retravaillés.
 # v3 : tête plus grande et sculptée (nez de félin, sourcils dorés en volutes, barbichette, joues, rides du museau).
+# v13 : mâchoire du bas un peu affinée ; peau du visage : écailles-tuiles graduées sur le front et le chanfrein qui
+#       se changent en galets (peau granuleuse) sur les joues et autour des yeux, truffe et lèvres lisses avec
+#       quelques pores, plis profonds, rangée de petites pointes le long des joues.
 # v12 : mâchoire du bas avec du volume (plus profonde, menton arrondi, joues musclées vers l'articulation).
 # v11 : mâchoire supérieure affinée en hauteur (dessus du museau −38 %, dessous remonté de 22 %).
 # v10 : museau affiné (−26 % en largeur, −20 % en hauteur par le dessus), à partir de l'arrière des yeux.
@@ -216,9 +219,16 @@ def build_eye(a, P, f, u, side_v, S):
     lid = [c + e1 * L * x + e2 * Hh * (0.75 - 0.35 * max(0.0, x)) + out * D * (0.45 + 0.45 * (1 - abs(x)))
            for x in np.linspace(-1.2, 1.15, 8)]
     a.add("Body", *tube(lid, [0.07, 0.19, 0.25, 0.28, 0.28, 0.24, 0.16, 0.06], 6, up=out))
+    # Peau granuleuse sur la paupière : une rangée de petits galets sur le bourrelet.
+    lid_r = [0.07, 0.19, 0.25, 0.28, 0.28, 0.24, 0.16, 0.06]
+    lid_up = normalize(e2 * 0.75 + out * 0.65)
+    for i in range(1, 7):
+        for off in (-0.25, 0.25):
+            q = lid[i] + (lid[i + (1 if off > 0 else -1)] - lid[i]) * abs(off) + lid_up * lid_r[i] * 0.92
+            a.add("Body", *gem(q, e1, lid_up, normalize(np.cross(lid_up, e1)), 0.06 * S, 0.035 * S, 0.06 * S))
 
     # Poche sous l'œil : 2 plis superposés en croissant, posés sur la peau.
-    for k, (dy, r) in enumerate(((0.36, 0.085), (0.56, 0.07))):
+    for k, (dy, r) in enumerate(((0.36, 0.1), (0.56, 0.085))):
         fold = []
         for q in np.linspace(-1, 1, 7):
             xx = ex + 0.05 + q * (0.55 - 0.08 * k)
@@ -320,6 +330,9 @@ def relief(x, y, side_w, top_w=0.0, z=None):
     # Arête du nez : léger creux, puis la truffe qui se relève au bout.
     d -= 0.07 * gauss((x - 4.0) / 0.22) * top_w
     d += 0.12 * gauss((x - 4.5) / 0.22) * top_w
+    # Plis en travers sur le dessus du chanfrein, là où la peau se tasse.
+    for xc in (3.05, 3.4):
+        d += (0.06 * gauss((x - xc) / 0.06) - 0.07 * gauss((x - xc + 0.1) / 0.05)) * top_w
     if z is not None:
         # Arête tranchante au milieu du museau : prend le relais du pli entre les arcades, jusqu'à la truffe.
         d += 0.16 * gauss(z / 0.16) * smoothstep(2.75, 3.05, x) * (1 - smoothstep(4.3, 4.6, x)) * top_w
@@ -454,34 +467,120 @@ def build_head(a, neck, neck_r):
                 line.append(P(*(skull_point(xx, tt) + skin_normal(xx, tt) * 0.02)))
             a.add("Body", *tube(line, [0.0, 0.11, 0.13, 0.12, 0.08, 0.0], 5))
 
-    def head_scale(x, t, size):
-        """Petite écaille en losange posée sur la peau, la pointe vers l'arrière de la tête."""
+    # ---------- Peau du visage ----------
+    # Un seul système d'éléments posés sur la peau : en haut (front, chanfrein) ce sont des écailles en losange
+    # qui se chevauchent comme des tuiles, pointe vers l'arrière ; sur les côtés (joues, autour des yeux) elles
+    # deviennent progressivement des galets ronds serrés. Truffe et lèvres restent lisses.
+    def skin_frame(x, t):
         p0 = skull_point(x, t)
-        dxp = skull_point(x + 0.05, t) - skull_point(x - 0.05, t)
-        dtp = skull_point(x, t + 0.05) - skull_point(x, t - 0.05)
+        dxp = skull_point(x + 0.04, t) - skull_point(x - 0.04, t)
+        dtp = skull_point(x, t + 0.04) - skull_point(x, t - 0.04)
         nrm = normalize(np.cross(dxp, dtp))
-        if nrm[1] < 0:
+        if nrm @ (p0 - np.array([x, skull_section(x)[0], 0.0])) < 0:
             nrm = -nrm
-        back, side_v = np.array([-1.0, 0, 0]), normalize(dtp)
-        L, W, H = size * 1.5, size * 1.1, size * 0.45
-        sink = -nrm * size * 0.25
-        loc = [p0 - back * L * 0.45 + sink, p0 + side_v * W / 2 + sink, p0 + back * L * 0.55 + sink,
-               p0 - side_v * W / 2 + sink, p0 + back * L * 0.25 + nrm * H]
-        a.add("Body", [P(*q) for q in loc], [(0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4), (0, 3, 2), (0, 2, 1)])
+        back = normalize(-dxp - nrm * (-dxp @ nrm))
+        return p0, nrm, back, normalize(np.cross(nrm, back))
 
-    # Front au-dessus des arcades : écailles en losange qui se chevauchent, en quinconce.
-    for row, x in enumerate(np.arange(-0.35, 1.75, 0.21)):
-        offs = np.arange(-4, 5) * 0.17 + (0.085 if row % 2 else 0.0)
-        for dt in offs:
-            t = np.pi / 2 + dt
-            if abs(dt) > 0.72:
-                continue
-            bp = base_point(x, t)
-            if brow_bump(*bp) > 0.06 or (0.75 < x < 1.75 and abs(dt) < 0.2):   # pas sur l'arcade ni la marque dorée
-                continue
-            if min(np.linalg.norm(bp - np.array([-0.1, 1.5, 0.7])), np.linalg.norm(bp - np.array([-0.1, 1.5, -0.7]))) < 0.45:
-                continue                                                         # pas sur la base des cornes
-            head_scale(x, t, 0.19)
+    def skin_element(x, t, size, b):
+        """b = 1 : écaille-tuile en losange ; b = 0 : galet rond. Entre les deux : mélange progressif."""
+        p0, nrm, back, side_v = skin_frame(x, t)
+        L_back = size * (0.42 + 0.5 * b)      # la pointe arrière s'allonge pour les écailles
+        L_front = size * (0.42 + 0.12 * b)
+        W = size * (0.42 + 0.1 * b)
+        H = size * (0.3 + 0.08 * b)
+        sink = -nrm * size * 0.14
+        base = []
+        for k in range(5):
+            ang = 2 * np.pi * k / 5               # k = 0 : vers l'arrière
+            ca, sa = np.cos(ang), np.sin(ang)
+            r_back = L_back if ca > 0 else L_front
+            base.append(p0 + back * ca * r_back + side_v * sa * W + sink)
+        apex = p0 + back * size * 0.28 * b + nrm * H
+        verts = [P(*q) for q in base + [apex]]
+        faces = [(k, (k + 1) % 5, 5) for k in range(5)] + [(0, 2, 1), (0, 3, 2), (0, 4, 3)]
+        a.add("Body", verts, faces)
+
+    def skin_zone(x, t):
+        """Taille de l'élément et b (écaille 1 / galet 0) ; None si la peau doit rester nue à cet endroit."""
+        bp = base_point(x, t)
+        y, z = bp[1], abs(bp[2])
+        dt = abs(t - np.pi / 2)
+        ex, ey = EYE
+        d_eye = np.hypot((x - ex) / 0.75, (y - ey) / 0.45)
+        if d_eye < 1.0 and z > 0.9:
+            return None                                                   # l'œil et sa paupière
+        if brow_bump(x, y, z) > 0.2:
+            return None                                                   # crête de l'arcade (sourcils dorés)
+        if 0.75 < x < 1.75 and dt < 0.2:
+            return None                                                   # marque dorée du front
+        if x > 4.05 or (x > 0.4 and y < -0.42):
+            return None                                                   # truffe et lèvres : peau lisse
+        if x < -0.7 or y < -0.62:
+            return None
+        for hb in ((-0.1, 1.5, 0.7), (3.7, None, 0.0), (4.25, None, 0.0)):
+            hx, hy, hz = hb
+            hy = skull_top(hx) if hy is None else hy
+            if np.linalg.norm(np.array([x - hx, y - hy, z - hz])) < (0.45 if hz else 0.22):
+                return None                                               # bases des cornes
+        if x > 2.75 and dt < 0.12:
+            return None                                                   # arête tranchante du museau
+        # Écailles en haut, galets sur les côtés et près des yeux, transition douce.
+        b = (1 - smoothstep(0.45, 1.0, dt)) * smoothstep(0.9, 1.6, d_eye)
+        scale_size = 0.42 * (1 - 0.5 * smoothstep(0.0, 0.85, dt)) * (1 - 0.68 * smoothstep(1.2, 4.0, x)) \
+            * (1 - 0.35 * (1 - smoothstep(1.0, 1.8, d_eye)))
+        pebble_size = 0.17 - 0.04 * (1 - smoothstep(1.0, 1.6, d_eye))
+        return pebble_size + (scale_size - pebble_size) * b, b
+
+    cands = []
+    for x in np.arange(-0.7, 4.06, 0.06):
+        for t in np.arange(np.pi / 2 - 1.75, np.pi / 2 + 1e-6, 0.045):
+            z = skin_zone(x, t)
+            if z is not None:
+                cands.append((z[0], x, t, z[1]))
+    cands.sort(key=lambda c: -c[0])
+    placed, pts = [], np.zeros((0, 3)), 
+    pts = np.zeros((0, 3))
+    rad = np.zeros(0)
+    gap = np.zeros(0)
+    for size, x, t, b in cands:
+        p = skull_point(x, t)
+        r = size * 0.5
+        g = 0.72 + 0.28 * (1 - b)                     # les tuiles se chevauchent, les galets se touchent
+        if len(pts) and np.any(np.linalg.norm(pts - p, axis=1) < (rad + r) * np.minimum(gap, g)):
+            continue
+        pts = np.vstack([pts, p])
+        rad = np.append(rad, r)
+        gap = np.append(gap, g)
+        placed.append((x, t, size, b))
+    for x, t, size, b in placed:
+        skin_element(x, t, size, b)
+        if abs(t - np.pi / 2) > 0.02:                 # symétrique (le milieu n'est posé qu'une fois)
+            skin_element(x, np.pi - t, size, b)
+
+    # Rangée de petites pointes coniques le long des joues, qui suivent la mâchoire vers l'arrière.
+    for side in (1, -1):
+        for k, x in enumerate(np.linspace(2.2, -0.65, 8)):
+            y = np.interp(x, [-0.65, 2.2], [-0.12, -0.42])
+            b0 = P(x, y, (skull_side(x, y) - 0.03) * side)
+            L = 0.32 + 0.26 * k / 7
+            tip = b0 + (-f * 0.75 + s * side * 0.62 - u * 0.1) * L * S
+            a.add("Horns", *tube([b0, (b0 + tip) / 2 + s * side * 0.03 * S, tip], [0.11 + 0.05 * k / 7, 0.07, 0.0], 5))
+
+    # Plis au coin de la gueule : 3 rides en éventail.
+    for side in (1, -1):
+        for k, (dy, L) in enumerate(((0.12, 0.55), (0.0, 0.7), (-0.12, 0.5))):
+            fold = []
+            for q in np.linspace(0, 1, 5):
+                xx = 0.75 - q * L
+                yy = -0.42 + dy * q + 0.05 * np.sin(q * np.pi)
+                fold.append(P(xx, yy, (skull_side(xx, yy) + 0.03) * side))
+            a.add("Body", *tube(fold, [0.0, 0.11, 0.12, 0.09, 0.0], 5))
+
+    # Truffe et lèvres lisses : seulement quelques pores, en rangées sur les coussinets des moustaches.
+    for side in (1, -1):
+        for x, y in ((3.75, -0.18), (3.95, -0.22), (4.15, -0.22), (3.85, -0.36), (4.05, -0.4)):
+            p0 = P(x, y, (skull_side(x, y) + 0.005) * side)
+            a.add("Pupils", *gem(p0, f, u, s * side, 0.035 * S, 0.035 * S, 0.02 * S))
 
     # Mâchoire du bas, entrouverte de 20°.
     hinge = np.array([0.4, -0.55])
@@ -503,8 +602,8 @@ def build_head(a, neck, neck_r):
     # Mâchoire du bas avec du volume : le dessus (dents, langue) reste en place, le dessous descend
     # en ventre arrondi, avec des joues musclées vers l'articulation et un menton marqué.
     # Profil : x, dessus, dessous, demi-largeur.
-    JAW = [(0.0, -0.4, -1.42, 1.2), (0.8, -0.52, -1.62, 1.18), (1.6, -0.59, -1.6, 1.08), (2.4, -0.62, -1.54, 1.0),
-           (3.0, -0.63, -1.48, 0.95), (3.55, -0.61, -1.5, 0.86), (3.95, -0.63, -1.36, 0.72), (4.2, -0.72, -1.12, 0.45)]
+    JAW = [(0.0, -0.4, -1.34, 1.16), (0.8, -0.52, -1.48, 1.12), (1.6, -0.59, -1.46, 1.03), (2.4, -0.62, -1.42, 0.96),
+           (3.0, -0.63, -1.37, 0.91), (3.55, -0.61, -1.38, 0.83), (3.95, -0.63, -1.28, 0.7), (4.2, -0.72, -1.08, 0.44)]
 
     def jaw_bottom(x):
         return np.interp(x, [j[0] for j in JAW], [j[2] for j in JAW])
@@ -703,7 +802,7 @@ def build_head(a, neck, neck_r):
 
 
 def build():
-    a = Asset("Dragon_Long_v12")
+    a = Asset("Dragon_Long_v13")
     for name, (color, mat) in COULEURS.items():
         a.part(name, color, mat)
     pts = catmull_rom(SPINE, RINGS)
