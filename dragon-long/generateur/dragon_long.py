@@ -1,6 +1,8 @@
 # Dragon Long (dragon chinois) stylisé, low-poly.
 # v1 : premier croquis. v2 : écailles en relief sur le dos, plaques sur le ventre, crête plus fournie, yeux retravaillés.
 # v3 : tête plus grande et sculptée (nez de félin, sourcils dorés en volutes, barbichette, joues, rides du museau).
+# v8 : nez agressif : arête tranchante sur le museau, corne de nez, narines en fentes inclinées comme le V
+#      des arcades avec ailes évasées, rides en chevrons, bout du museau plus crochu.
 # v7 : nez de la v4 (museau, coussinets, narines en virgule, rides du museau) + zone des yeux de la v6.
 # v6 : zone des yeux (arcades en V froncé, pli entre les arcades, yeux mi-clos, poches à 2 plis, pommettes,
 #      écailles du front) ; narines creusées vers l'intérieur.
@@ -312,6 +314,9 @@ def relief(x, y, side_w, top_w=0.0, z=None):
     # Arête du nez : léger creux, puis la truffe qui se relève au bout.
     d -= 0.07 * gauss((x - 4.0) / 0.22) * top_w
     d += 0.12 * gauss((x - 4.5) / 0.22) * top_w
+    if z is not None:
+        # Arête tranchante au milieu du museau : prend le relais du pli entre les arcades, jusqu'à la truffe.
+        d += 0.16 * gauss(z / 0.16) * smoothstep(2.75, 3.05, x) * (1 - smoothstep(4.3, 4.6, x)) * top_w
     return d
 
 
@@ -336,7 +341,7 @@ def skull_point(x, t):
     d = relief(x, yc + y, abs(nz) ** 1.5, max(0.0, ny) ** 2, z)
     # Avant du museau : la truffe déborde en haut, les coussinets avancent, le sillon recule au milieu.
     front = smoothstep(4.0, 4.72, x)
-    dx = 0.3 * front * max(0.0, st) ** 1.3
+    dx = 0.38 * front * max(0.0, st) ** 1.3          # truffe qui avance en crochet au-dessus de la gueule
     dx += 0.14 * front * np.clip(-st * abs(ct) * 2.2, 0, 1)
     dx -= 0.18 * front * gauss(ct / 0.22) * max(0.0, -st)
     return np.array([x + dx, yc + y + ny * d, z + nz * d])
@@ -385,18 +390,42 @@ def build_head(a, neck, neck_r):
     angs = np.arange(SIDES_HEAD) * 2 * np.pi / SIDES_HEAD
     a.add("Body", *loft([np.array([P(*skull_point(x, t)) for t in angs]) for x in xs]))
 
-    # Narines en virgule, creusées dans le haut de la truffe.
+    # Narines en fentes, inclinées comme le V des arcades (bas côté milieu, haut vers l'arrière et l'extérieur),
+    # avec une aile évasée en lame au-dessus de chacune.
     for side in (1, -1):
-        rim = skull_point(4.72, np.pi / 2 - side * 0.9)
-        n0 = P(*(rim * 0.72 + np.array([4.86, 0.05, 0.0]) * 0.28))
-        a.add("Pupils", *gem(n0, normalize(f * 0.9 + s * side * 0.3), u, normalize(s * side - f * 0.3),
-                             0.09 * S, 0.12 * S, 0.2 * S))
+        tt = np.pi / 2 - side * 0.95
+        c0 = skull_point(4.68, tt)
+        nrm = skin_normal(4.68, tt if side > 0 else np.pi - (np.pi - tt))
+        n_w = P(*(c0 + nrm)) - P(*c0)
+        n_w = normalize(n_w)
+        slit = normalize(-f * 0.55 + u * 0.5 + s * side * 0.45)
+        slit = normalize(slit - n_w * (slit @ n_w))
+        cen = P(*c0) - n_w * 0.02 * S
+        a.add("Pupils", *gem(cen, slit, n_w, normalize(np.cross(n_w, slit)), 0.33 * S, 0.06 * S, 0.1 * S))
+        wing_up = normalize(np.cross(slit, n_w) * side)
+        if wing_up @ u < 0:
+            wing_up = -wing_up
+        # L'aile suit la peau : chaque point est reposé sur le crâne puis légèrement soulevé.
+        wing = []
+        for k in (0.0, 0.25, 0.5, 0.75, 1.0):
+            xx, tt2 = 4.6 - 0.75 * k, np.pi / 2 - side * (0.78 - 0.18 * k)
+            wing.append(P(*(skull_point(xx, tt2) + skin_normal(xx, tt2) * (0.03 + 0.04 * k))))
+        a.add("Body", *tube(wing, [0.03, 0.1, 0.12, 0.08, 0.0], 5, up=n_w, flat=0.45))
 
-    # Rides du chanfrein (le « grognement » des félins) : 3 bourrelets en arc sur le museau.
-    for x in (2.55, 2.95, 3.35):
-        arc = [P(x + 0.06 * abs(np.cos(t)), skull_top(x) * np.sin(t) * 0.97 + 0.02 * (1 - np.sin(t)),
-                 skull_side(x, 0.3) * np.cos(t) * 0.92) for t in np.linspace(np.radians(35), np.radians(145), 7)]
-        a.add("Body", *tube(arc, [0.0, 0.07, 0.1, 0.11, 0.1, 0.07, 0.0], 5))
+    # Corne de nez au bout de l'arête, et une plus petite derrière, courbées vers l'arrière.
+    for x0, L, r in ((4.25, 0.8, 0.2), (3.7, 0.45, 0.13)):
+        b0 = P(*skull_point(x0, np.pi / 2)) - u * 0.05 * S
+        horn = [b0, b0 + (u * 0.4 + f * 0.05) * L * S, b0 + (u * 0.75 - f * 0.12) * L * S, b0 + (u * 0.95 - f * 0.4) * L * S]
+        a.add("Horns", *tube(horn, [r, r * 0.7, r * 0.4, 0.0], 6))
+
+    # Rides en chevrons : partent de l'arête et filent vers l'arrière et le bas, comme un museau qui gronde.
+    for side in (1, -1):
+        for x0 in (3.0, 3.35, 3.7):
+            line = []
+            for q in np.linspace(0, 1, 6):
+                xx, tt = x0 - 0.45 * q, np.pi / 2 - side * (0.28 + 0.75 * q)
+                line.append(P(*(skull_point(xx, tt) + skin_normal(xx, tt) * 0.02)))
+            a.add("Body", *tube(line, [0.0, 0.11, 0.13, 0.12, 0.08, 0.0], 5))
 
     def head_scale(x, t, size):
         """Petite écaille en losange posée sur la peau, la pointe vers l'arrière de la tête."""
@@ -554,7 +583,7 @@ def build_head(a, neck, neck_r):
 
 
 def build():
-    a = Asset("Dragon_Long_v7")
+    a = Asset("Dragon_Long_v8")
     for name, (color, mat) in COULEURS.items():
         a.part(name, color, mat)
     pts = catmull_rom(SPINE, RINGS)
