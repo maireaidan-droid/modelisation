@@ -1,6 +1,7 @@
 # Dragon Long (dragon chinois) stylisé, low-poly.
 # v1 : premier croquis. v2 : écailles en relief sur le dos, plaques sur le ventre, crête plus fournie, yeux retravaillés.
 # v3 : tête plus grande et sculptée (nez de félin, sourcils dorés en volutes, barbichette, joues, rides du museau).
+# v12 : mâchoire du bas avec du volume (plus profonde, menton arrondi, joues musclées vers l'articulation).
 # v11 : mâchoire supérieure affinée en hauteur (dessus du museau −38 %, dessous remonté de 22 %).
 # v10 : museau affiné (−26 % en largeur, −20 % en hauteur par le dessus), à partir de l'arrière des yeux.
 # v9 : intérieur de la gueule (gorge, palais à bourrelets, langue fendue) et dentition acérée.
@@ -499,10 +500,30 @@ def build_head(a, neck, neck_r):
         px, py = x - hinge[0], y - hinge[1]
         return P(hinge[0] + px * c - py * sn, hinge[1] + px * sn + py * c, z)
 
-    jaw = [jaw_ring(0.2, -0.85, 1.25, 0.42), jaw_ring(1.6, -0.95, 1.08, 0.36), jaw_ring(3.0, -0.95, 0.95, 0.32),
-           jaw_ring(3.8, -0.92, 0.82, 0.32), jaw_ring(4.15, -0.95, 0.5, 0.25)]
-    a.add("Body", *loft(jaw))
-    a.add("Belly", *loft([jaw_ring(0.4, -1.08, 1.02, 0.25), jaw_ring(3.7, -1.12, 0.62, 0.2)]))
+    # Mâchoire du bas avec du volume : le dessus (dents, langue) reste en place, le dessous descend
+    # en ventre arrondi, avec des joues musclées vers l'articulation et un menton marqué.
+    # Profil : x, dessus, dessous, demi-largeur.
+    JAW = [(0.0, -0.4, -1.42, 1.2), (0.8, -0.52, -1.62, 1.18), (1.6, -0.59, -1.6, 1.08), (2.4, -0.62, -1.54, 1.0),
+           (3.0, -0.63, -1.48, 0.95), (3.55, -0.61, -1.5, 0.86), (3.95, -0.63, -1.36, 0.72), (4.2, -0.72, -1.12, 0.45)]
+
+    def jaw_bottom(x):
+        return np.interp(x, [j[0] for j in JAW], [j[2] for j in JAW])
+
+    def jaw_section(x, top, bot, w, n=12, p=2.4):
+        """Section de la mâchoire : super-ellipse (flancs pleins), un peu plus large en bas qu'en haut."""
+        yc, h = (top + bot) / 2, (top - bot) / 2
+        out = []
+        for t in np.pi / n + np.arange(n) * 2 * np.pi / n:
+            ct, st = np.cos(t), np.sin(t)
+            zz = w * muzzle_w(x) * np.sign(ct) * abs(ct) ** (2 / p) * (1.0 if st > 0 else 1.06)
+            yy = yc + h * np.sign(st) * abs(st) ** (2 / p)
+            out.append(jaw_point(x, yy, zz))
+        return np.array(out)
+
+    a.add("Body", *loft([jaw_section(*j) for j in JAW]))
+    # Bande dorée sous la mâchoire, qui suit le nouveau dessous.
+    a.add("Belly", *loft([jaw_section(x, jaw_bottom(x) + 0.42, jaw_bottom(x) - 0.04, w * 0.72, 10)
+                          for x, w in ((0.4, 1.15), (1.6, 1.0), (2.8, 0.88), (3.6, 0.7))]))
     # Lèvre du haut en bourrelet, qui remonte au coin de la gueule.
     for side in (1, -1):
         lip = [Pm(x, y + jaw_lift(x), z * side) for x, y, z in
@@ -540,9 +561,10 @@ def build_head(a, neck, neck_r):
                                 P(x, y0 - 0.06, 0.0), P(x, y0 - 0.1, wz * 0.95)]))
         if x < 3.9:
             j0 = jaw_top(x)
-            floor.append(np.array([jaw_point(x, j0 - 0.2, wz * 0.9), jaw_point(x, j0 - 0.2, -wz * 0.9),
-                                   jaw_point(x, j0 + 0.04, -wz * 0.85), jaw_point(x, j0, 0.0),
-                                   jaw_point(x, j0 + 0.04, wz * 0.85)]))
+            jw = np.interp(x, [j[0] for j in JAW], [j[3] for j in JAW]) * muzzle_w(x) * 0.72   # dans la mâchoire
+            floor.append(np.array([jaw_point(x, j0 - 0.2, jw * 0.9), jaw_point(x, j0 - 0.2, -jw * 0.9),
+                                   jaw_point(x, j0 + 0.04, -jw), jaw_point(x, j0, 0.0),
+                                   jaw_point(x, j0 + 0.04, jw)]))
     a.add("Mouth", *loft(palate))
     a.add("Mouth", *loft(floor))
     # Palais : 4 bourrelets en travers, visibles quand on regarde dans la gueule.
@@ -669,7 +691,8 @@ def build_head(a, neck, neck_r):
 
     # Barbichette : 3 grosses mèches rouges sous le menton, qui descendent puis s'enroulent vers l'arrière.
     for z, L, r in ((0.0, 1.0, 0.34), (0.32, 0.8, 0.26), (-0.32, 0.8, 0.26)):
-        b0 = jaw_point(3.7 - abs(z) * 0.5, -1.1, z)
+        xb = 3.7 - abs(z) * 0.5
+        b0 = jaw_point(xb, jaw_bottom(xb) + 0.08, z)
         rel = ((0, 0), (-0.1, -0.6), (-0.45, -1.3), (-1.05, -1.85), (-1.7, -1.95), (-2.1, -1.65), (-1.95, -1.35))
         pts = [b0 + (f * dx * L + u * dy * L + s * z * 0.4 * min(1, -dy)) * S for dx, dy in rel]
         line = catmull_rom(pts, 14)
@@ -680,7 +703,7 @@ def build_head(a, neck, neck_r):
 
 
 def build():
-    a = Asset("Dragon_Long_v11")
+    a = Asset("Dragon_Long_v12")
     for name, (color, mat) in COULEURS.items():
         a.part(name, color, mat)
     pts = catmull_rom(SPINE, RINGS)
