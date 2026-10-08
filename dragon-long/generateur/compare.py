@@ -1,5 +1,5 @@
 # Planche de comparaison en gros plan sur la tête entre deux versions exportées (.glb).
-# Usage : python compare.py Dragon_Long_v4 Dragon_Long_v5 [nez|yeux]
+# Usage : python compare.py Dragon_Long_v4 Dragon_Long_v5 [nez|yeux|gueule]
 import os
 import sys
 import numpy as np
@@ -51,7 +51,12 @@ def main(old, new, mode="nez"):
     tete = np.asarray(a.head_center) - shift
     nez = tete + np.array([0, -0.35, 3.6])
     yeux = tete + np.array([0, 0.5, 1.0])
-    if mode == "yeux":
+    gueule = tete + np.array([0, -1.0, 2.7])
+    if mode == "gueule":
+        views = [(-4, -90, "gueule de face", gueule, 2.6), (-8, -55, "gueule trois-quarts", gueule, 2.8),
+                 (2, 0, "gueule profil", gueule, 3.0), (-30, -75, "gueule vue d'en dessous", gueule, 2.8)]
+        mode_name = "gueule"
+    elif mode == "yeux":
         views = [(8, -90, "yeux de face", yeux, 2.9), (12, -45, "yeux trois-quarts", yeux, 2.9),
                  (4, 0, "yeux profil", yeux, 3.0), (35, -150, "front, vue de dessus", yeux, 3.4)]
         mode_name = "yeux"
