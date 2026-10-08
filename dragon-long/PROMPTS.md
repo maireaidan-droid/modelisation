@@ -223,3 +223,42 @@ et un de profil, et vérifie qu'on voit encore les yeux de face.
 | Regard pas assez méchant | `Fais descendre l'arcade de 15 % sur l'œil et accentue le V entre les sourcils.` |
 | Yeux invisibles de face | `Recule légèrement l'arcade ou avance l'œil pour qu'il reste visible de face.` |
 | Zone trop lisse | `Ajoute les plis sous les yeux et sur le chanfrein, sans dépasser le budget de triangles.` |
+
+---
+
+## 9. Prompt de modification : aspect de la peau du visage
+
+```
+Sur le dragon existant, modifie uniquement la surface de la peau du visage
+(front, chanfrein, joues, paupières, lèvres). Ne change pas les volumes déjà
+en place (nez, arcades, orbites, mâchoire), seulement leur relief de surface.
+
+Aspect visé (référence : buste sculpté de dragon oriental) :
+- front et dessus du chanfrein : écailles en losange qui se chevauchent comme
+  des tuiles, pointes vers l'arrière, grandes au milieu du front et de plus en
+  plus petites vers les yeux et la truffe ;
+- joues, paupières et dessous des yeux : peau granuleuse « en galets »,
+  petits bombements ronds serrés (peau de crocodile/iguane), pas d'écailles plates ;
+- truffe et lèvres : peau plus lisse et charnue, juste quelques pores ;
+- plis profonds aux endroits où la peau se tasse : entre les sourcils,
+  sur le chanfrein, sous les yeux, au coin de la bouche ;
+- le long des joues, une rangée de petites pointes coniques qui suivent
+  la ligne de la mâchoire vers l'arrière ;
+- transitions douces entre les zones : les écailles se transforment
+  progressivement en galets, sans bord net.
+
+Contraintes : relief sculpté dans la géométrie (pas peint en texture),
+symétrie, couleurs et matériaux inchangés. Le modèle étant low-poly à facettes,
+rester sous ~15 000 triangles : suggérer les écailles par des facettes
+saillantes plutôt que de les modéliser une par une, et réserver le détail
+au front et au chanfrein. Génère une nouvelle version avec un aperçu de face
+et de trois quarts.
+```
+
+### Retouches
+| Problème | Prompt |
+|---|---|
+| Peau trop lisse | `Accentue le relief des galets sur les joues et creuse davantage les plis.` |
+| Trop de bruit, visage illisible | `Réduis la densité des écailles et garde les grands volumes lisibles.` |
+| Écailles qui paraissent collées | `Fonds les écailles dans la peau : elles doivent sortir de la surface, pas posées dessus.` |
+| Budget dépassé | `Supprime les écailles des zones peu visibles (dessous, arrière des joues).` |
