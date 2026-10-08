@@ -1,6 +1,7 @@
 # Dragon Long (dragon chinois) stylisé, low-poly.
 # v1 : premier croquis. v2 : écailles en relief sur le dos, plaques sur le ventre, crête plus fournie, yeux retravaillés.
 # v3 : tête plus grande et sculptée (nez de félin, sourcils dorés en volutes, barbichette, joues, rides du museau).
+# v14 : peau du visage en écailles couchées (plaques presque à plat, bord arrière à peine soulevé) au lieu de pointes.
 # v13 : mâchoire du bas un peu affinée ; peau du visage : écailles-tuiles graduées sur le front et le chanfrein qui
 #       se changent en galets (peau granuleuse) sur les joues et autour des yeux, truffe et lèvres lisses avec
 #       quelques pores, plis profonds, rangée de petites pointes le long des joues.
@@ -482,22 +483,23 @@ def build_head(a, neck, neck_r):
         return p0, nrm, back, normalize(np.cross(nrm, back))
 
     def skin_element(x, t, size, b):
-        """b = 1 : écaille-tuile en losange ; b = 0 : galet rond. Entre les deux : mélange progressif."""
+        """Écaille couchée sur la peau, comme une tuile : bouclier arrondi à 6 côtés, presque plat ; le bord avant
+        s'enfonce sous la précédente, le bord arrière se soulève à peine. b = 1 : plus allongée (front) ;
+        b petit : plus ronde (joues)."""
         p0, nrm, back, side_v = skin_frame(x, t)
-        L_back = size * (0.42 + 0.5 * b)      # la pointe arrière s'allonge pour les écailles
-        L_front = size * (0.42 + 0.12 * b)
-        W = size * (0.42 + 0.1 * b)
-        H = size * (0.3 + 0.08 * b)
-        sink = -nrm * size * 0.14
+        L_back = size * (0.52 + 0.22 * b)
+        L_front = size * (0.48 + 0.04 * b)
+        W = size * 0.5
         base = []
-        for k in range(5):
-            ang = 2 * np.pi * k / 5               # k = 0 : vers l'arrière
+        for k in range(6):
+            ang = 2 * np.pi * k / 6               # k = 0 : vers l'arrière (bord libre)
             ca, sa = np.cos(ang), np.sin(ang)
             r_back = L_back if ca > 0 else L_front
-            base.append(p0 + back * ca * r_back + side_v * sa * W + sink)
-        apex = p0 + back * size * 0.28 * b + nrm * H
+            lift = size * (0.035 + 0.035 * b) * max(0.0, ca) - size * 0.13 * max(0.0, -ca)
+            base.append(p0 + back * ca * r_back + side_v * sa * W + nrm * (lift - size * 0.02))
+        apex = p0 + back * size * 0.12 + nrm * size * (0.085 + 0.025 * (1 - b))
         verts = [P(*q) for q in base + [apex]]
-        faces = [(k, (k + 1) % 5, 5) for k in range(5)] + [(0, 2, 1), (0, 3, 2), (0, 4, 3)]
+        faces = [(k, (k + 1) % 6, 6) for k in range(6)] + [(0, 2, 1), (0, 3, 2), (0, 4, 3), (0, 5, 4)]
         a.add("Body", verts, faces)
 
     def skin_zone(x, t):
@@ -525,10 +527,10 @@ def build_head(a, neck, neck_r):
         if x > 2.75 and dt < 0.12:
             return None                                                   # arête tranchante du museau
         # Écailles en haut, galets sur les côtés et près des yeux, transition douce.
-        b = (1 - smoothstep(0.45, 1.0, dt)) * smoothstep(0.9, 1.6, d_eye)
-        scale_size = 0.42 * (1 - 0.5 * smoothstep(0.0, 0.85, dt)) * (1 - 0.68 * smoothstep(1.2, 4.0, x)) \
+        b = 0.3 + 0.7 * (1 - smoothstep(0.45, 1.0, dt)) * smoothstep(0.9, 1.6, d_eye)
+        scale_size = 0.48 * (1 - 0.5 * smoothstep(0.0, 0.85, dt)) * (1 - 0.68 * smoothstep(1.2, 4.0, x)) \
             * (1 - 0.35 * (1 - smoothstep(1.0, 1.8, d_eye)))
-        pebble_size = 0.17 - 0.04 * (1 - smoothstep(1.0, 1.6, d_eye))
+        pebble_size = 0.2 - 0.05 * (1 - smoothstep(1.0, 1.6, d_eye))
         return pebble_size + (scale_size - pebble_size) * b, b
 
     cands = []
@@ -545,7 +547,7 @@ def build_head(a, neck, neck_r):
     for size, x, t, b in cands:
         p = skull_point(x, t)
         r = size * 0.5
-        g = 0.72 + 0.28 * (1 - b)                     # les tuiles se chevauchent, les galets se touchent
+        g = 0.7 + 0.15 * (1 - b)                      # les écailles se chevauchent comme des tuiles
         if len(pts) and np.any(np.linalg.norm(pts - p, axis=1) < (rad + r) * np.minimum(gap, g)):
             continue
         pts = np.vstack([pts, p])
@@ -802,7 +804,7 @@ def build_head(a, neck, neck_r):
 
 
 def build():
-    a = Asset("Dragon_Long_v13")
+    a = Asset("Dragon_Long_v14")
     for name, (color, mat) in COULEURS.items():
         a.part(name, color, mat)
     pts = catmull_rom(SPINE, RINGS)
