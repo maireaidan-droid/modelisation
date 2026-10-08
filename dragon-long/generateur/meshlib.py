@@ -20,11 +20,25 @@ class Asset:
     def __init__(self, name):
         self.name = name
         self.parts = {}
+        # Squelette (pour l'animation) : chaque sommet garde le numéro du « groupe » qui l'a créé
+        # (corps, tête, mâchoire, patte, mèche…) ; les os sont enregistrés dans self.bones.
+        self.groups = [{"kind": "spine"}]
+        self.gid = 0
+        self.bones = {}
+
+    def new_group(self, kind, **meta):
+        self.groups.append(dict(kind=kind, **meta))
+        return len(self.groups) - 1
+
+    def bone(self, name, pos, parent=None, basis=None):
+        """Os : position (repère du modèle), parent, et axes locaux X, Y, Z (colonnes de basis)."""
+        self.bones[name] = {"pos": np.asarray(pos, float), "parent": parent,
+                            "basis": np.eye(3) if basis is None else np.column_stack(basis)}
 
     def part(self, name, color, material="SmoothPlastic"):
-        self.parts.setdefault(name, {"color": color, "material": material, "v": [], "f": []})
+        self.parts.setdefault(name, {"color": color, "material": material, "v": [], "f": [], "g": []})
 
-    def add(self, part_name, verts, faces):
+    def add(self, part_name, verts, faces, vgroups=None):
         """Ajoute un volume fermé ; l'orientation des faces est corrigée pour qu'elles regardent vers l'extérieur."""
         verts = np.asarray(verts, float)
         faces = np.asarray(faces, int)
@@ -35,6 +49,7 @@ class Asset:
         base = len(p["v"])
         p["v"].extend(verts.tolist())
         p["f"].extend((faces + base).tolist())
+        p["g"].extend(list(vgroups) if vgroups is not None else [self.gid] * len(verts))
 
     def add_split(self, verts, faces, labels):
         """Ajoute un volume fermé dont les faces vont dans plusieurs parties (une même peau, plusieurs couleurs)."""
@@ -49,6 +64,7 @@ class Asset:
             base = len(p["v"])
             p["v"].extend(verts.tolist())
             p["f"].extend((faces[labels == name] + base).tolist())
+            p["g"].extend([self.gid] * len(verts))
 
     def tri_count(self):
         return sum(len(p["f"]) for p in self.parts.values())

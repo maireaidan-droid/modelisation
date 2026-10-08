@@ -2,7 +2,8 @@
 Dragon Long v18 : réglages automatiques après l'import dans Roblox Studio.
 
 Utilisation :
-  1. Importer Dragon_Long_v18.glb (Avatar > Import 3D, unité Stud, parties séparées, Anchored).
+  1. Importer Dragon_Long_v18_rig.glb (version animable, avec squelette) ou Dragon_Long_v18.glb (statique)
+     (Avatar > Import 3D, unité Stud, parties séparées, Anchored).
   2. Sélectionner le modèle importé dans l'Explorer (sinon le script cherche un modèle « Dragon_Long_v… » dans le Workspace).
   3. Affichage > Barre de commande (View > Command Bar), coller TOUT ce script, Entrée.
 
@@ -10,13 +11,15 @@ Le script :
   - applique la couleur et le matériau de chaque partie (yeux en Neon) ;
   - coupe les collisions du modèle détaillé et ajoute une Hitbox invisible autour de la tête ;
   - range un exemplaire dans ServerStorage > Dragons > Dragon_Long ;
-  - laisse le modèle importé dans le Workspace comme exemplaire de test (renommé Dragon_Long_Test).
+  - laisse le modèle importé dans le Workspace comme exemplaire de test (renommé Dragon_Long_Test) ;
+  - ajoute le tag « DragonLong » et l'attribut Mode = "Idle", utilisés par DragonAnimator pour l'animer.
 Il ne supprime rien. Ctrl+Z annule tout.
 ]]
 
 local Selection = game:GetService("Selection")
 local ServerStorage = game:GetService("ServerStorage")
 local ChangeHistoryService = game:GetService("ChangeHistoryService")
+local CollectionService = game:GetService("CollectionService")
 
 local PARTS = {
 	Body     = { color = "#2F7D63", material = Enum.Material.SmoothPlastic, shadow = true },
@@ -107,6 +110,10 @@ if #eyes > 0 and not model:FindFirstChild("Hitbox") then
 end
 
 if body then model.PrimaryPart = body end
+
+-- Animation : DragonAnimator retrouve le dragon grâce à ce tag et lit son mode (Idle / Walk / Fly).
+CollectionService:AddTag(model, "DragonLong")
+if model:GetAttribute("Mode") == nil then model:SetAttribute("Mode", "Idle") end
 
 -- 5. Rangement : un exemplaire dans ServerStorage > Dragons, l'importé reste dans le Workspace pour le test
 local dragons = ServerStorage:FindFirstChild("Dragons") or Instance.new("Folder")

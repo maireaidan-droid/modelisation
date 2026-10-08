@@ -9,6 +9,7 @@ Comparaisons : [gueule v15 / v16](comparaison-gueule-Dragon_Long_v15-Dragon_Long
 
 | Version | Fichier | Triangles | Nouveautés |
 |---|---|---|---|
+| **v18 animé** | `objets/Dragon_Long_v18_rig.glb` | 28 662 | même modèle avec un squelette de 40 os (colonne, tête, mâchoire, yeux, paupières, crinière, moustaches, barbichette, pattes) ; animé par `roblox/DragonAnimator.client.lua` (repos, marche, vol, clignements) — [démo](https://claude.ai/artifact/CoMHQnaW5y4rfVDCPfsx8h) |
 | **v18** (actuelle) | `objets/Dragon_Long_v18.glb` | 28 662 | crête du dos en mèches de flammes (même style que la crinière), petites flammes sur les côtés de la queue, grande flamme en éventail au bout de la queue ; écailles du corps couchées en tuiles plates (même nombre qu'avant) |
 | v17 | `objets/Dragon_Long_v17.glb` | 26 058 | cornes épaisses à anneaux en relief avec 2 branches ; pattes musclées (épaule, biceps, coude marqué avec mèches de flammes, pied large à 3 doigts articulés, griffes recourbées, ergot) ; crinière en 2 couches de mèches de flammes qui ondulent et finissent en pointe ; flammes des joues dans le même style ([aperçu](apercu-Dragon_Long_v17.png)) |
 | v16 | `objets/Dragon_Long_v16.glb` | 20 912 | intérieur de la gueule entièrement rouge : la peau elle-même est colorée (dessous de la mâchoire du haut, dessus de la mâchoire du bas, intérieur des lèvres), plus de plaques qui dépassent ; lèvre du bas recalée à la ligne des dents ; corps épaissi de 15 % (pattes en proportion) ([aperçu](apercu-Dragon_Long_v16.png)) |
@@ -49,6 +50,12 @@ Pour le faire avec une session Claude locale connectée à Studio : coller [PROM
 
 **Avatar → Import 3D**, unité **Stud**, parties séparées. Le pivot est sous le dragon (Y = 0) et la tête regarde vers +Z.
 Pour les nageoires, mettre `DoubleSided = true` si elles disparaissent sous certains angles.
+
+## Animation
+- `generateur/build_rig.py` exporte `objets/Dragon_Long_v18_rig.glb` (même géométrie, plus le squelette et les poids de peau) et `objets/Dragon_Long_v18_rig.json` (liste des os).
+- `roblox/DragonAnimator.client.lua` (LocalScript, StarterPlayerScripts) anime les os ; l'attribut `Mode` du Model choisit `Idle`, `Walk` ou `Fly`.
+- `roblox/DragonDemo.server.lua` (Script, ServerScriptService, optionnel) fait enchaîner repos, marche et vol en cercle.
+- `demo/animator.js` est la même logique en JavaScript, utilisée par la démo web.
 
 ## Comparer deux versions
 ```

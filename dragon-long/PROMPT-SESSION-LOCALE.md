@@ -1,12 +1,12 @@
-# Dragon Long v18 : import dans Roblox Studio (instructions pour une session Claude locale)
+# Dragon Long v18 (animé) : import dans Roblox Studio (instructions pour une session Claude locale)
 
 > **À coller tel quel dans une NOUVELLE conversation Claude locale** (connectée à Roblox Studio par MCP),
-> après avoir importé le fichier `Dragon_Long_v18.glb` (voir « Import »).
+> après avoir importé le fichier `Dragon_Long_v18_rig.glb` (voir « Import »).
 
 ---
 
 ## Contexte
-Tu m'aides à intégrer un **dragon chinois (Long)** dans mon jeu Roblox. C'est un modèle low-poly à facettes, généré par code, en **un seul fichier `.glb` découpé en 9 parties** (une par couleur). Il est **statique** (pas encore de squelette ni d'animation).
+Tu m'aides à intégrer un **dragon chinois (Long)** dans mon jeu Roblox. C'est un modèle low-poly à facettes, généré par code, en **un seul fichier `.glb` découpé en 9 parties** (une par couleur). Il a un **squelette de 40 os** : un script (`DragonAnimator`) le fait onduler, cligner des yeux, marcher et voler.
 
 Parle en **français**, simplement, et explique ce que tu fais.
 
@@ -19,7 +19,7 @@ Parle en **français**, simplement, et explique ce que tu fais.
 ## Le modèle
 | | |
 |---|---|
-| Fichier | `Dragon_Long_v18.glb` (branche `claude/roblox-3d-dragons-t7lch1` du dépôt `maireaidan-droid/modelisation`, dossier `dragon-long/objets/`) |
+| Fichier | `Dragon_Long_v18_rig.glb` (branche `claude/roblox-3d-dragons-t7lch1` du dépôt `maireaidan-droid/modelisation`, dossier `dragon-long/objets/`) |
 | Taille attendue | **16,5 × 19 × 58 studs** (largeur × hauteur × longueur) |
 | Triangles | environ 28 700 au total |
 | Orientation | la **tête regarde vers +Z**, le pivot est **sous le dragon** (Y = 0), centré |
@@ -38,7 +38,7 @@ Parle en **français**, simplement, et explique ce que tu fais.
 | `Tongue` | langue | `#B9434C` (rouge rosé) | SmoothPlastic | 192 |
 
 ## Import (fait par moi, à la main)
-1. Dans Studio : **Avatar → Import 3D** (ou **Fichier → Import 3D**), puis choisir `Dragon_Long_v18.glb`.
+1. Dans Studio : **Avatar → Import 3D** (ou **Fichier → Import 3D**), puis choisir `Dragon_Long_v18_rig.glb`.
 2. Dans la fenêtre d'import :
    - unité **Stud** ;
    - parties **séparées** (ne pas fusionner) ;
@@ -74,5 +74,10 @@ Un `PointLight` jaune très discret dans `Eyes` (Brightness 0,5, Range 6, `Shado
 - Simulateur d'appareil **téléphone** : la scène reste fluide avec le dragon visible. Avec environ 28 700 triangles, un dragon à l'écran ne pose pas de problème ; s'il en faut beaucoup, dis-le-moi, il faudra une version allégée.
 - Récapitule-moi ce que tu as fait, où est rangé le modèle, et ce qui reste à faire.
 
-## Pour plus tard (ne pas faire maintenant)
-Le dragon est **statique**. Pour le faire onduler en volant, il faudra une version avec squelette (os) : elle sera générée à part.
+## E. Animation
+Fichiers fournis avec le modèle : `DragonAnimator.client.lua` et `DragonDemo.server.lua`.
+1. Vérifie que l'import a bien créé des **Bones** (objets `Bone`) dans les MeshParts du dragon, avec les noms `Root`, `Neck`, `Head`, `Jaw`, `S01`…`S14`, `Eye_L`, `Lid_L`, `Mane_Top`, `LegFL_Upper`… (40 en tout). S'il n'y en a aucun, l'import a perdu le squelette : préviens-moi.
+2. Crée un **LocalScript** `DragonAnimator` dans `StarterPlayer > StarterPlayerScripts` et colle `DragonAnimator.client.lua`. Il anime chez chaque joueur tout Model tagué `DragonLong` (le script de réglage ajoute le tag) ou dont le nom commence par `Dragon_Long`.
+3. Le mode se règle avec l'attribut **`Mode`** du Model : `Idle` (repos), `Walk` (marche), `Fly` (vol).
+4. Pour tester : crée un **Script** `DragonDemo` dans `ServerScriptService` et colle `DragonDemo.server.lua`. Le dragon `Dragon_Long_Test` enchaîne repos, marche et vol en cercle. **Si le dragon avance à reculons**, mets `HEAD_FORWARD = -1` en haut du script.
+5. Lance le jeu (Play) et montre-moi une vidéo ou des captures : ondulation, clignement, pattes en marche, pattes repliées en vol.

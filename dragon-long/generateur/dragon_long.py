@@ -89,6 +89,7 @@ def build_body(a, pts, T, N, B, radii):
         base = len(p["v"])
         p["v"].extend(verts.tolist())
         p["f"].extend((fl + base).tolist())
+        p["g"].extend([a.gid] * len(verts))
 
 
 def surface(pts, T, N, B, radii, x, ang, k=1.0):
@@ -185,13 +186,17 @@ def flame_lock(a, base, back, out, L, r, part="Fins", curl=1.0, samples=10, thin
     a.add(part, *tube(line, radii, 5, up=out if thin is None else thin, flat=0.42))
 
 
-def build_leg(a, hip, fwd, down, side):
+def build_leg(a, hip, fwd, down, side, name="Leg", parent="Root"):
     """Patte musclée : épaule, bras galbé, coude marqué (avec mèches de flammes), avant-bras, gros pied
     à 3 doigts articulés et griffes recourbées, plus un ergot."""
     up = -down
     elbow = hip + side * 1.55 + down * 0.95 - fwd * 0.35
     wrist = elbow + down * 1.5 + fwd * 0.85 + side * 0.12
     foot = wrist + down * 0.42 + fwd * 0.3
+    a.groups[a.gid]["poly"] = [hip, elbow, wrist, foot]
+    a.bone(name + "_Upper", hip, parent)
+    a.bone(name + "_Fore", elbow, name + "_Upper")
+    a.bone(name + "_Foot", wrist, name + "_Fore")
     # Épaule : masse musclée qui se fond dans le corps.
     a.add("Body", *blob(hip + side * 0.45 + down * 0.1, fwd, up, side, 1.0, 0.95, 0.85, 8, 5))
     # Bras (biceps galbé) puis avant-bras.
@@ -231,7 +236,11 @@ def build_legs(a, pts, T, N, B, radii):
         for s in (1, -1):
             side = normalize(B[i] * s - np.dot(B[i] * s, down) * down)
             hip = pts[i] + B[i] * s * radii[i] * 0.6 - N[i] * radii[i] * 0.35
-            build_leg(a, hip, fwd, down, side)
+            name = ("LegF" if t < 0.5 else "LegB") + ("L" if (hip - pts[i])[0] > 0 else "R")
+            parent = "Root" if t < 0.5 else "S07"
+            a.gid = a.new_group("leg", leg=name, parent=parent)
+            build_leg(a, hip, fwd, down, side, name, parent)
+            a.gid = 0
 
 
 def build_eye(a, P, f, u, side_v, S):
@@ -245,6 +254,13 @@ def build_eye(a, P, f, u, side_v, S):
     if e2 @ u < 0:
         e2 = -e2
     L, Hh, D = 0.6 * S, 0.24 * S, 0.19 * S
+    nm = "L" if sd > 0 else "R"
+    g_head = a.gid
+    a.bone("Eye_" + nm, c, "Head", (e1, e2, out))
+    a.bone("Lid_" + nm, c, "Head", (e1, e2, out))
+    # Angle de fermeture de la paupière (rotation autour de son axe X) : le bourrelet passe devant l'œil.
+    a.blink_angle = float(np.arctan2(Hh * 0.75, D * 0.9))
+    a.gid = a.new_group("bone", bone="Eye_" + nm)
 
     # Amande étroite.
     rings = [c - e1 * L]
@@ -257,6 +273,7 @@ def build_eye(a, P, f, u, side_v, S):
     # Pupille fendue, verticale.
     a.add("Pupils", *gem(c + out * D * 0.95 + e1 * L * 0.05, e1, e2, out, 0.07 * S, Hh * 0.9, 0.06 * S))
 
+    a.gid = a.new_group("bone", bone="Lid_" + nm)
     # Paupière du haut lourde : couvre la moitié de l'œil (regard mi-clos), plus basse côté nez (air colérique).
     lid = [c + e1 * L * x + e2 * Hh * (0.75 - 0.35 * max(0.0, x)) + out * D * (0.45 + 0.45 * (1 - abs(x)))
            for x in np.linspace(-1.2, 1.15, 8)]
@@ -269,6 +286,7 @@ def build_eye(a, P, f, u, side_v, S):
             q = lid[i] + (lid[i + (1 if off > 0 else -1)] - lid[i]) * abs(off) + lid_up * lid_r[i] * 0.92
             a.add("Body", *gem(q, e1, lid_up, normalize(np.cross(lid_up, e1)), 0.06 * S, 0.035 * S, 0.06 * S))
 
+    a.gid = g_head
     # Poche sous l'œil : 2 plis superposés en croissant, posés sur la peau.
     for k, (dy, r) in enumerate(((0.36, 0.1), (0.56, 0.085))):
         fold = []
@@ -478,6 +496,20 @@ def build_head(a, neck, neck_r):
     def P(x, y, z):
         return origin + (f * x + u * y + s * z) * S
 
+    # Squelette de la tête : axes locaux X = côté gauche, Y = haut, Z = avant.
+    frame = (s, u, f)
+    a.bone("Head", P(-0.9, 0.2, 0), "Neck", frame)
+    a.bone("Jaw", P(0.4, -0.55, 0), "Head", frame)
+    G_HEAD = a.new_group("bone", bone="Head")
+    G_JAW = a.new_group("bone", bone="Jaw")
+    a.gid = G_HEAD
+
+    def lock_group(bone, base, length, parent="Head", pos=None):
+        """Mèche souple : la base reste sur la tête, le bout suit l'os de la mèche."""
+        if bone not in a.bones:
+            a.bone(bone, base if pos is None else pos, parent, frame)
+        return a.new_group("lock", bone=bone, parent=parent, base=np.asarray(base, float), length=float(length))
+
     def Pm(x, y, z):
         """Comme P, mais la largeur suit l'affinement du museau."""
         return P(x, y, z * muzzle_w(x))
@@ -663,6 +695,7 @@ def build_head(a, neck, neck_r):
         px, py = x - hinge[0], y - hinge[1]
         return P(hinge[0] + px * c - py * sn, hinge[1] + px * sn + py * c, z)
 
+    a.gid = G_JAW
     # Mâchoire du bas avec du volume : le dessus (dents, langue) reste en place, le dessous descend
     # en ventre arrondi, avec des joues musclées vers l'articulation et un menton marqué.
     # Profil : x, dessus, dessous, demi-largeur.
@@ -700,6 +733,8 @@ def build_head(a, neck, neck_r):
     # Bande dorée sous la mâchoire, qui suit le nouveau dessous.
     a.add("Belly", *loft([jaw_section(x, jaw_bottom(x) + 0.42, jaw_bottom(x) - 0.04, w * 0.72, 10)
                           for x, w in ((0.4, 1.15), (1.6, 1.0), (2.8, 0.88), (3.6, 0.7))]))
+    a.gid = G_HEAD
+
     def add_lip(line, radii, inward):
         """Bourrelet de lèvre : la moitié tournée vers l'intérieur de la gueule est rouge."""
         verts, faces = tube(line, radii, 6)
@@ -717,13 +752,16 @@ def build_head(a, neck, neck_r):
         lip = [Pm(x, y + jaw_lift(x), z * side) for x, y, z in
                ((0.5, -0.25, 1.45), (1.2, -0.6, 1.35), (2.2, -0.75, 1.2), (3.2, -0.78, 1.1), (3.9, -0.72, 0.95))]
         lip_line = catmull_rom(lip, 9)
+        a.gid = G_HEAD
         add_lip(lip_line, [0.06, 0.12, 0.15, 0.16, 0.16, 0.15, 0.14, 0.12, 0.05], normalize(-s * side - u * 0.8))
         # Lèvre du bas posée sur le bord de la mâchoire, à la ligne des dents : elle cache le bord de l'intérieur rouge.
         jw = lambda x: np.interp(x, [j[0] for j in JAW], [j[3] for j in JAW]) * muzzle_w(x)
         jt = lambda x: np.interp(x, [j[0] for j in JAW], [j[1] for j in JAW])
         low = [jaw_point(x, jt(x) - 0.04, jw(x) * 0.84 * side) for x in (0.5, 1.3, 2.1, 2.9, 3.6, 4.0)]
+        a.gid = G_JAW
         add_lip(catmull_rom(low, 10), [0.04, 0.1, 0.12, 0.12, 0.12, 0.12, 0.12, 0.11, 0.08, 0.03],
                 normalize(-s * side + u * 0.8))
+        a.gid = G_HEAD
 
     def jaw_up(x):
         return normalize(jaw_point(x, 0.0, 0.0) - jaw_point(x, -1.0, 0.0))
@@ -745,7 +783,9 @@ def build_head(a, neck, neck_r):
                                P(x, top_y - 0.15, -wz), jaw_point(x, bot_y + 0.12, -wz),
                                jaw_point(x, bot_y, -wz * 0.55), jaw_point(x, bot_y - 0.04, 0.0),
                                jaw_point(x, bot_y, wz * 0.55), jaw_point(x, bot_y + 0.12, wz), P(x, top_y - 0.15, wz)]))
-    a.add("Mouth", *loft(rings))
+    gv, gf = loft(rings)
+    # Gorge : le haut suit la tête, le bas suit la mâchoire.
+    a.add("Mouth", gv, gf, vgroups=[G_JAW if (i < 30 and 4 <= i % 10 <= 8) else G_HEAD for i in range(len(gv))])
     # Palais : 4 bourrelets en travers, visibles quand on regarde dans la gueule.
     for x in (1.6, 2.2, 2.8, 3.35):
         yc, w, ht, hb = skull_section(x)
@@ -758,6 +798,7 @@ def build_head(a, neck, neck_r):
     tongue = [jaw_point(x, jaw_top(x) + lift, 0.0) for x, lift in
               ((0.6, 0.2), (1.5, 0.21), (2.4, 0.22), (3.1, 0.25), (3.55, 0.38))]
     tl = catmull_rom(tongue, 9)
+    a.gid = G_JAW
     a.add("Tongue", *tube(tl, [0.36, 0.41, 0.42, 0.4, 0.37, 0.33, 0.29, 0.25, 0.2], 8, tip=False,
                           up=jaw_up(2.0), flat=0.38))
     for side in (1, -1):
@@ -765,6 +806,7 @@ def build_head(a, neck, neck_r):
         fork = [b0, b0 + (f * 0.25 + s * side * 0.12) * S + jaw_up(3.6) * 0.12 * S,
                 b0 + (f * 0.45 + s * side * 0.25) * S + jaw_up(3.6) * 0.32 * S]
         a.add("Tongue", *tube(fork, [0.15, 0.1, 0.0], 6, up=jaw_up(3.6), flat=0.5))
+    a.gid = G_HEAD
 
     # Dentition acérée : dents fines à 3 faces (arêtes tranchantes), recourbées vers la gorge,
     # longues et courtes en alternance, crocs en poignard et incisives pointues devant.
@@ -783,6 +825,7 @@ def build_head(a, neck, neck_r):
         fang(Pm(3.45, -0.66 + jaw_lift(3.45), 0.95 * side), -u, 0.62, 0.1)                        # croc secondaire
         for z in (0.2, 0.47):
             fang(Pm(4.3 - z * 0.35, -0.66 + jaw_lift(4.3), z * side), -u, 0.3, 0.065)           # incisives
+        a.gid = G_JAW
         # Rangée du bas, sur la mâchoire, pointes vers le haut.
         for k, x in enumerate(np.arange(1.3, 3.4, 0.3)):
             w = np.interp(x, [0.2, 1.6, 3.0, 3.8], [1.25, 1.08, 0.95, 0.82]) * 0.82 * muzzle_w(x)
@@ -791,6 +834,7 @@ def build_head(a, neck, neck_r):
         fang(jaw_point(3.55, -0.65, 0.66 * muzzle_w(3.55) * side), jaw_up(3.55), 0.85, 0.14)      # croc du bas
         for z in (0.18, 0.4):
             fang(jaw_point(4.0 - z * 0.3, -0.72, z * muzzle_w(4.0) * side), jaw_up(4.0), 0.26, 0.06)
+        a.gid = G_HEAD
 
     # Yeux : amande dorée qui brille, pupille fendue, paupières.
     for side in (1, -1):
@@ -835,7 +879,9 @@ def build_head(a, neck, neck_r):
         for y0, L in ((0.15, 1.15), (-0.25, 1.35), (-0.65, 1.05)):
             b0 = on_skin(0.2, y0, side, -0.02)
             out = normalize(s * side * 0.85 + u * 0.3)
+            a.gid = lock_group("Mane_" + ("L" if side > 0 else "R"), b0, 2.0 * L * S, pos=P(-0.6, 0.0, 1.35 * side))
             flame_lock(a, b0, normalize(-f + u * 0.15 + s * side * 0.2), out, L * S, 0.24 * S, samples=8)
+            a.gid = G_HEAD
 
     # Cornes en bois de cerf : épaisses à la base, anneaux en relief, 2 branches, pointe qui se recourbe.
     def ridged(path, r0, n, ring=2.4, sides=7):
@@ -864,7 +910,9 @@ def build_head(a, neck, neck_r):
     for side in (1, -1):
         pts = [Pm(4.1, -0.25 + jaw_lift(4.1) * 0.6, 1.05 * side), P(3.9, -0.35, 2.2 * side), P(2.8, -0.8, 3.4 * side),
                P(1.0, -0.45, 4.3 * side), P(-0.9, -1.05, 4.9 * side), P(-2.8, -0.65, 5.3 * side)]
+        a.gid = lock_group("Whisker_" + ("L" if side > 0 else "R"), pts[0], 8.0 * S)
         a.add("Whiskers", *tube(catmull_rom(pts, 14), np.linspace(0.16, 0.0, 14), 4))
+        a.gid = G_HEAD
 
     # Crinière : mèches de flammes épaisses en 2 couches autour de la nuque, qui partent vers l'arrière.
     for layer, (x0, ring_r, n, L_top, L_side, r) in enumerate(((-0.55, 1.3, 11, 2.7, 2.0, 0.34),
@@ -876,7 +924,13 @@ def build_head(a, neck, neck_r):
             out = normalize(u * rad_y + s * rad_z)
             back = normalize(-f + out * 0.15)
             L = (L_top if abs(ang) < np.radians(100) else L_side) * (0.9 + 0.2 * ((i * 0.37) % 1))
+            if rad_y > 0.35:
+                bn, bp = "Mane_Top", P(-0.6, 1.45, 0.0)
+            else:
+                bn, bp = ("Mane_L", P(-0.6, 0.0, 1.35)) if rad_z > 0 else ("Mane_R", P(-0.6, 0.0, -1.35))
+            a.gid = lock_group(bn, base, 2.0 * L * S, pos=bp)
             flame_lock(a, base, back, out, L * S, r * S * 0.9, curl=1.0 if i % 2 else -0.6)
+            a.gid = G_HEAD
 
     # Barbichette : 3 grosses mèches rouges sous le menton, qui descendent puis s'enroulent vers l'arrière.
     for z, L, r in ((0.0, 1.0, 0.34), (0.32, 0.8, 0.26), (-0.32, 0.8, 0.26)):
@@ -884,11 +938,15 @@ def build_head(a, neck, neck_r):
         b0 = jaw_point(xb, jaw_bottom(xb) + 0.08, z)
         rel = ((0, 0), (-0.1, -0.6), (-0.45, -1.3), (-1.05, -1.85), (-1.7, -1.95), (-2.1, -1.65), (-1.95, -1.35))
         pts = [b0 + (f * dx * L + u * dy * L + s * z * 0.4 * min(1, -dy)) * S for dx, dy in rel]
+        a.gid = lock_group("Beard", b0, 3.2 * S, parent="Jaw", pos=jaw_point(3.6, jaw_bottom(3.6), 0.0))
         line = catmull_rom(pts, 14)
         radii = [r * np.sin(np.pi * (0.15 + 0.85 * k / 13)) ** 0.6 for k in range(14)]
         radii[-1] = 0.0
         a.add("Fins", *tube(line, radii, 6, up=s, flat=0.45))
+    a.gid = 0
 
+
+SPINE_BONES = [(0, "Head"), (7, "Neck"), (14, "Root")] + [(18 + 4 * k, "S%02d" % (k + 1)) for k in range(14)]
 
 
 def build():
@@ -899,6 +957,14 @@ def build():
     T, N, B = frames(pts)
     t = np.linspace(0, 1, RINGS)
     radii = np.array([body_radius(x) for x in t])
+    a.spine_pts = pts
+    # Colonne : Root au poitrail, Neck vers la tête, S01…S14 jusqu'au bout de la queue.
+    a.bone("Root", pts[14])
+    a.bone("Neck", pts[7], "Root")
+    prev = "Root"
+    for i, nm in SPINE_BONES[3:]:
+        a.bone(nm, pts[i], prev)
+        prev = nm
     build_body(a, pts, T, N, B, radii)
     build_scales(a, pts, T, N, B, radii)
     build_belly_plates(a, pts, T, N, B, radii)

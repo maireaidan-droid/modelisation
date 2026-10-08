@@ -1,0 +1,136 @@
+{
+  "name": "Dragon_Long_v18_rig",
+  "tris": 28662,
+  "bones": [
+    "Root",
+    "Neck",
+    "S01",
+    "S02",
+    "S03",
+    "S04",
+    "S05",
+    "S06",
+    "S07",
+    "S08",
+    "S09",
+    "S10",
+    "S11",
+    "S12",
+    "S13",
+    "S14",
+    "LegFL_Upper",
+    "LegFL_Fore",
+    "LegFL_Foot",
+    "LegFR_Upper",
+    "LegFR_Fore",
+    "LegFR_Foot",
+    "LegBL_Upper",
+    "LegBL_Fore",
+    "LegBL_Foot",
+    "LegBR_Upper",
+    "LegBR_Fore",
+    "LegBR_Foot",
+    "Head",
+    "Jaw",
+    "Eye_L",
+    "Lid_L",
+    "Eye_R",
+    "Lid_R",
+    "Mane_L",
+    "Mane_R",
+    "Whisker_L",
+    "Whisker_R",
+    "Mane_Top",
+    "Beard"
+  ],
+  "parents": {
+    "Root": null,
+    "Neck": "Root",
+    "S01": "Root",
+    "S02": "S01",
+    "S03": "S02",
+    "S04": "S03",
+    "S05": "S04",
+    "S06": "S05",
+    "S07": "S06",
+    "S08": "S07",
+    "S09": "S08",
+    "S10": "S09",
+    "S11": "S10",
+    "S12": "S11",
+    "S13": "S12",
+    "S14": "S13",
+    "LegFL_Upper": "Root",
+    "LegFL_Fore": "LegFL_Upper",
+    "LegFL_Foot": "LegFL_Fore",
+    "LegFR_Upper": "Root",
+    "LegFR_Fore": "LegFR_Upper",
+    "LegFR_Foot": "LegFR_Fore",
+    "LegBL_Upper": "S07",
+    "LegBL_Fore": "LegBL_Upper",
+    "LegBL_Foot": "LegBL_Fore",
+    "LegBR_Upper": "S07",
+    "LegBR_Fore": "LegBR_Upper",
+    "LegBR_Foot": "LegBR_Fore",
+    "Head": "Neck",
+    "Jaw": "Head",
+    "Eye_L": "Head",
+    "Lid_L": "Head",
+    "Eye_R": "Head",
+    "Lid_R": "Head",
+    "Mane_L": "Head",
+    "Mane_R": "Head",
+    "Whisker_L": "Head",
+    "Whisker_R": "Head",
+    "Mane_Top": "Head",
+    "Beard": "Jaw"
+  },
+  "blink_angle_rad": 0.811,
+  "parts": {
+    "Body": {
+      "tris": 14730,
+      "color": "#2F7D63",
+      "material": "SmoothPlastic"
+    },
+    "Belly": {
+      "tris": 3362,
+      "color": "#E2B65C",
+      "material": "SmoothPlastic"
+    },
+    "Fins": {
+      "tris": 5794,
+      "color": "#C8432F",
+      "material": "SmoothPlastic"
+    },
+    "Horns": {
+      "tris": 2404,
+      "color": "#E6DCC3",
+      "material": "SmoothPlastic"
+    },
+    "Whiskers": {
+      "tris": 1288,
+      "color": "#F0C24B",
+      "material": "SmoothPlastic"
+    },
+    "Eyes": {
+      "tris": 96,
+      "color": "#FFD23F",
+      "material": "Neon"
+    },
+    "Pupils": {
+      "tris": 112,
+      "color": "#17120E",
+      "material": "SmoothPlastic"
+    },
+    "Mouth": {
+      "tris": 684,
+      "color": "#8E2529",
+      "material": "SmoothPlastic"
+    },
+    "Tongue": {
+      "tris": 192,
+      "color": "#B9434C",
+      "material": "SmoothPlastic"
+    }
+  }
+}

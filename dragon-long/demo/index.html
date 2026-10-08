@@ -106,11 +106,11 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
 
 <header class="card">
   <h1>Dragon Long</h1>
-  <p>Dragon chinois low-poly pour Roblox, version 18. Fais-le tourner, zoome, ou lance le vol.</p>
+  <p>Dragon chinois low-poly pour Roblox, version 18 avec squelette. Choisis une animation, fais-le tourner, zoome.</p>
   <div class="facts">
     <span><b>28 662</b> triangles</span>
     <span><b>58</b> studs de long</span>
-    <span><b>9</b> parties</span>
+    <span><b>40</b> os</span>
   </div>
 </header>
 
@@ -119,8 +119,13 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
 <div id="status">Chargement du dragon…</div>
 
 <nav class="controls" aria-label="Commandes de la démo">
+  <div class="group" role="group" aria-label="Animation">
+    <button data-mode="Idle" aria-pressed="true">Repos</button>
+    <button data-mode="Walk" aria-pressed="false">Marche</button>
+    <button data-mode="Fly" aria-pressed="false">Vol</button>
+  </div>
+  <div class="sep" aria-hidden="true"></div>
   <div class="group">
-    <button id="btn-fly" aria-pressed="true">Vol</button>
     <button id="btn-spin" aria-pressed="false">Rotation</button>
   </div>
   <div class="sep" aria-hidden="true"></div>
@@ -135,6 +140,7 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="animator.js"></script>
 <script>
 (function () {
   const stage = document.getElementById("stage");
@@ -187,25 +193,17 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
   const pivot = new THREE.Group();
   scene.add(pivot);
 
-  // Ondulation du vol : le corps ondule de plus en plus vers la queue, la tête reste presque stable.
-  const shared = { uTime: { value: 0 }, uFly: { value: reduceMotion ? 0 : 1 } };
-  function addWave(material) {
-    material.flatShading = true;
-    material.onBeforeCompile = function (shader) {
-      shader.uniforms.uTime = shared.uTime;
-      shader.uniforms.uFly = shared.uFly;
-      shader.vertexShader = "uniform float uTime;\nuniform float uFly;\n" + shader.vertexShader.replace(
-        "#include <begin_vertex>",
-        [
-          "vec3 transformed = vec3(position);",
-          "float w = clamp((26.0 - position.z) / 55.0, 0.0, 1.0);",
-          "w = w * w * (3.0 - 2.0 * w);",
-          "transformed.x += sin(position.z * 0.17 - uTime * 2.2) * 2.2 * w * uFly;",
-          "transformed.y += cos(position.z * 0.11 - uTime * 1.6) * 1.1 * w * uFly;"
-        ].join("\n")
-      );
-    };
-    material.needsUpdate = true;
+  // Os du squelette : pose de repos, puis l'animateur (le même calcul que le script Roblox) les fait bouger.
+  const bones = {}, rest = {};
+  const euler = new THREE.Euler(), quat = new THREE.Quaternion(), off = new THREE.Vector3();
+  let anim = null;
+  function setBone(name, rx, ry, rz, ty, tz) {
+    const b = bones[name];
+    if (!b) return;
+    euler.set(rx, ry, rz, "XYZ");
+    b.quaternion.copy(rest[name].q).multiply(quat.setFromEuler(euler));
+    off.set(0, ty || 0, tz || 0).applyQuaternion(rest[name].q);
+    b.position.copy(rest[name].p).add(off);
   }
 
   const views = {
@@ -238,7 +236,7 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
   resize();
   goTo("trois", true);
 
-  // Le modèle est joint à la page encodé en base64 (dragon_v18.txt) : on le décode puis on le lit comme un .glb.
+  // Le modèle est joint à la page encodé en base64 (dragon_v18_rig.txt) : on le décode puis on le lit comme un .glb.
   function onModel(gltf) {
     const model = gltf.scene;
     model.traverse(function (o) {
@@ -249,16 +247,22 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
         if (m.emissive) m.emissive.convertSRGBToLinear();
         if (o.name.indexOf("Eyes") === 0 || (m.emissive && m.emissive.getHex() !== 0)) m.emissiveIntensity = 1.6;
         if (o.name.indexOf("Fins") === 0 || o.name.indexOf("Whiskers") === 0) m.side = THREE.DoubleSide;
-        addWave(m);
+        m.flatShading = true;
+        o.frustumCulled = false;
+      }
+      if (o.isBone) {
+        bones[o.name] = o;
+        rest[o.name] = { q: o.quaternion.clone(), p: o.position.clone() };
       }
     });
+    anim = DragonAnimator.create(bones, setBone);
     pivot.add(model);
     status.hidden = true;
   }
   function onError() {
     status.textContent = "Le modèle n'a pas pu être chargé. Recharge la page pour réessayer.";
   }
-  fetch("dragon_v18.txt")
+  fetch("dragon_v18_rig.txt")
     .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
     .then(function (b64) {
       const bin = atob(b64.trim());
@@ -269,17 +273,17 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
     .catch(onError);
 
   // Commandes
-  const btnFly = document.getElementById("btn-fly");
   const btnSpin = document.getElementById("btn-spin");
-  let fly = !reduceMotion, spin = false;
-  btnFly.setAttribute("aria-pressed", String(fly));
-  btnFly.addEventListener("click", function () {
-    fly = !fly;
-    btnFly.setAttribute("aria-pressed", String(fly));
-  });
+  let spin = false, mode = "Idle";
   btnSpin.addEventListener("click", function () {
     spin = !spin;
     btnSpin.setAttribute("aria-pressed", String(spin));
+  });
+  document.querySelectorAll("[data-mode]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      mode = b.dataset.mode;
+      document.querySelectorAll("[data-mode]").forEach(function (o) { o.setAttribute("aria-pressed", String(o === b)); });
+    });
   });
   document.querySelectorAll("[data-view]").forEach(function (b) {
     b.addEventListener("click", function () { goTo(b.dataset.view); });
@@ -287,13 +291,9 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
   controls.addEventListener("start", function () { tween = null; });
 
   const clock = new THREE.Clock();
-  let flyAmount = shared.uFly.value;
   function loop() {
     const dt = Math.min(clock.getDelta(), 0.05);
-    shared.uTime.value += dt;
-    flyAmount += ((fly ? 1 : 0) - flyAmount) * Math.min(1, dt * 3);
-    shared.uFly.value = flyAmount;
-    pivot.position.y = Math.sin(shared.uTime.value * 1.1) * 0.8 * flyAmount;
+    if (anim) anim.update(reduceMotion ? 0 : dt, mode);
     if (spin) pivot.rotation.y += dt * 0.25;
     if (tween) {
       tween.t = Math.min(1, tween.t + dt / 1.1);
