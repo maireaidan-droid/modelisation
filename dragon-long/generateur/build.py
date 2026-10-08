@@ -17,6 +17,7 @@ os.makedirs(OUT, exist_ok=True)
 
 FOND = "#3B3335"
 LUMIERE = normalize([0.4, 0.8, 0.6])
+CONTRE_JOUR = normalize([-0.3, -0.7, 0.4])  # lumière douce par-dessous, pour lire le ventre
 
 
 def render(ax, asset, elev, azim, title, zoom=1.35, focus=None):
@@ -31,7 +32,7 @@ def render(ax, asset, elev, azim, title, zoom=1.35, focus=None):
         if p["material"] == "Neon":
             shade = np.ones(len(tri))
         else:
-            shade = 0.38 + 0.62 * np.clip(n @ LUMIERE, 0, 1)
+            shade = 0.38 + 0.62 * np.clip(n @ LUMIERE, 0, 1) + 0.22 * np.clip(n @ CONTRE_JOUR, 0, 1)
         cols.extend(np.clip(base[None] * shade[:, None], 0, 1))
         # Roblox (x, y, z) -> matplotlib (x, -z, y) : Y reste vertical.
         tris.extend(tri[:, :, [0, 2, 1]] * np.array([1, -1, 1]))
@@ -71,22 +72,30 @@ def main():
                       for k, p in a.parts.items()},
         })
 
-        fig = plt.figure(figsize=(16, 14), facecolor=FOND)
-        head = (np.array([0, mx[1] - 4, mx[2] - 5]), 6.5)
+        fig = plt.figure(figsize=(16, 20), facecolor=FOND)
+        head = (np.array([0, mx[1] - 4, mx[2] - 5]), 5.5)
+        dos = (np.array([4, 7, mx[2] - 22]), 6.5)
         centre = ((mn + mx) / 2, (mx - mn)[:2].max() / 2 + 1)
-        views = [(221, 5, 0, "Profil gauche", None), (222, 25, -55, "Trois-quarts", None),
-                 (234, 5, -90, "Face", centre), (235, 8, 90, "Dos", centre), (236, 15, -40, "Tête (gros plan)", head)]
+        views = [(321, 5, 0, "Profil gauche", None), (322, 25, -55, "Trois-quarts", None),
+                 (323, 8, -90, "Tête de face", head), (324, 12, -35, "Tête trois-quarts", head),
+                 (325, 45, 20, "Écailles et crête du dos", dos), (326, -55, 30, "Ventre (dessous)", centre)]
         for pos, e, az, t, foc in views:
             ax = fig.add_subplot(pos, projection="3d")
             render(ax, a, e, az, t, zoom=1.35 if foc is not None else 1.75, focus=foc)
         size = manifest[-1]["size_studs"]
         fig.suptitle(f"{a.name}  ·  {a.tri_count()} triangles  ·  {size[0]} × {size[1]} × {size[2]} studs (L × H × P)",
-                     color="white", fontsize=15)
-        plt.subplots_adjust(left=0, right=1, bottom=0, top=0.94, wspace=0, hspace=0.05)
+                     color="white", fontsize=15, y=0.995)
+        plt.subplots_adjust(left=0, right=1, bottom=0, top=0.95, wspace=0, hspace=0.05)
         fig.savefig(os.path.join(ROOT, f"apercu-{a.name}.png"), dpi=110, facecolor=FOND)
         plt.close(fig)
 
-    with open(os.path.join(OUT, "manifest.json"), "w") as fh:
+    # On garde dans le manifeste les versions précédentes déjà exportées.
+    path = os.path.join(OUT, "manifest.json")
+    if os.path.exists(path):
+        names = {m["name"] for m in manifest}
+        with open(path) as fh:
+            manifest = [m for m in json.load(fh) if m["name"] not in names] + manifest
+    with open(path, "w") as fh:
         json.dump(manifest, fh, indent=2, ensure_ascii=False)
     for m in manifest:
         print(m["name"], m["tris"], "tris", m["size_studs"])

@@ -1,4 +1,5 @@
-# Dragon Long (dragon chinois) stylisé, low-poly : premier croquis 3D.
+# Dragon Long (dragon chinois) stylisé, low-poly.
+# v1 : premier croquis. v2 : écailles en relief sur le dos, plaques sur le ventre, crête plus fournie, yeux retravaillés.
 # Corps de serpent en S, ventre doré, crinière et nageoires rouges, cornes en bois de cerf,
 # moustaches, 4 pattes à 3 griffes. Repère Roblox : Y en haut, 1 unité = 1 stud, la tête regarde vers +Z.
 import numpy as np
@@ -11,6 +12,7 @@ COULEURS = {
     "Horns": ("#E6DCC3", "SmoothPlastic"),     # cornes, griffes, dents
     "Whiskers": ("#F0C24B", "SmoothPlastic"),  # moustaches
     "Eyes": ("#FFD23F", "Neon"),               # yeux qui brillent
+    "Pupils": ("#17120E", "SmoothPlastic"),    # pupilles fendues
 }
 
 SIDES = 8          # côtés du corps (8 = bien facetté, léger pour téléphone)
@@ -65,14 +67,64 @@ def build_body(a, pts, T, N, B, radii):
         p["f"].extend((fl + base).tolist())
 
 
+def surface(pts, T, N, B, radii, x, ang, k=1.0):
+    """Point sur la peau du corps à l'anneau x (décimal) et à l'angle ang (pi/2 = dessus, 3pi/2 = ventre).
+    Renvoie le point, la normale vers l'extérieur, la tangente (vers la queue) et le rayon."""
+    i = int(np.clip(np.floor(x), 0, RINGS - 2))
+    w = x - i
+    p = pts[i] * (1 - w) + pts[i + 1] * w
+    t = normalize(T[i] * (1 - w) + T[i + 1] * w)
+    n = normalize(N[i] * (1 - w) + N[i + 1] * w)
+    b = normalize(B[i] * (1 - w) + B[i + 1] * w)
+    r = radii[i] * (1 - w) + radii[i + 1] * w
+    o = normalize(np.cos(ang) * b * 0.95 + np.sin(ang) * n * 1.05)
+    return p + (np.cos(ang) * b * 1.05 + np.sin(ang) * n * 0.95) * r * k, o, t, r
+
+
+def build_scales(a, pts, T, N, B, radii):
+    # Écailles en losange, en quinconce, la pointe relevée vers la queue (comme des tuiles qui se chevauchent).
+    step = 2 * np.pi / 10
+    spacing = np.linalg.norm(pts[1] - pts[0])
+    for row in range(3, RINGS - 4):
+        offs = [j * step for j in range(-3, 4)] if row % 2 == 0 else [(j + 0.5) * step for j in range(-3, 3)]
+        for d in offs:
+            c, o, t, r = surface(pts, T, N, B, radii, row + 0.5, np.pi / 2 + d, 0.97)
+            x = normalize(np.cross(o, t))
+            L, W, H = spacing * 1.7, r * step * 1.2, 0.1 + 0.07 * r
+            sink = -o * 0.1 * r
+            front, back = c - t * L * 0.45 + sink, c + t * L * 0.55 + sink
+            left, right = c - x * W / 2 + sink, c + x * W / 2 + sink
+            apex = c + t * L * 0.3 + o * H
+            verts = [front, right, back, left, apex]
+            faces = [(0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4), (0, 3, 2), (0, 2, 1)]
+            a.add("Body", verts, faces)
+
+
+def build_belly_plates(a, pts, T, N, B, radii):
+    # Plaques du ventre en bandes, comme sur la référence : bord avant bombé, qui redescend vers l'arrière.
+    angs = np.linspace(9 * np.pi / 8 + 0.08, 15 * np.pi / 8 - 0.08, 5)
+    for i in range(1, RINGS - 3):
+        sections = []
+        for sfrac, lift in ((0.06, 0.03), (0.35, 0.17), (0.94, 0.0)):
+            outer = []
+            for ang in angs:
+                p, o, t, r = surface(pts, T, N, B, radii, i + sfrac, ang, 1.0)
+                outer.append(p + o * lift * (0.5 + 0.5 * r / 1.85))
+            inner = [surface(pts, T, N, B, radii, i + sfrac, ang, 0.82)[0] for ang in (angs[-1], angs[0])]
+            sections.append(np.array(outer + inner))
+        a.add("Belly", *loft(sections))
+
+
 def build_spines(a, pts, T, N, B, radii):
-    # Épines du dos, couchées vers l'arrière, une grande / une petite.
-    for j, i in enumerate(range(5, RINGS - 4, 2)):
+    # Crête du dos en triangles, couchés vers l'arrière : grand / petit / moyen, penchés un peu à gauche puis à droite.
+    sizes = (1.3, 0.75, 1.0, 0.8)
+    for j, i in enumerate(range(4, RINGS - 4, 2)):
         r = radii[i]
         base_a = pts[i] + N[i] * r * 0.85
-        base_b = pts[i + 2] + N[i + 2] * radii[i + 2] * 0.85
-        h = (0.55 + 0.5 * r) * (1.25 if j % 2 == 0 else 0.8)
-        tip = (base_a + base_b) / 2 + N[i + 1] * h + T[i + 1] * h * 0.9
+        base_b = pts[i + 3] + N[i + 3] * radii[i + 3] * 0.85
+        h = (0.6 + 0.55 * r) * sizes[j % 4]
+        lean = B[i + 1] * (0.12 if j % 2 else -0.12) * h
+        tip = (base_a + base_b) / 2 + N[i + 1] * h + T[i + 1] * h * 0.95 + lean
         a.add("Fins", *fin(base_a, base_b, tip, B[i + 1], 0.14))
     # Franges sur les côtés de la queue.
     for i in range(int(RINGS * 0.55), RINGS - 3, 5):
@@ -120,6 +172,44 @@ def build_legs(a, pts, T, N, B, radii):
             side = normalize(B[i] * s - np.dot(B[i] * s, down) * down)
             hip = pts[i] + B[i] * s * radii[i] * 0.6 - N[i] * radii[i] * 0.35
             build_leg(a, hip, fwd, down, side)
+
+
+def build_eye(a, P, f, u, side_v, S):
+    sd = 1 if side_v @ np.cross(u, f) > 0 else -1
+    c = P(1.5, 0.5, 1.52 * sd)
+    out = normalize(side_v + f * 0.45 + u * 0.1)              # l'œil regarde un peu vers l'avant
+    e1 = normalize(f - out * (f @ out) - u * 0.22)            # grand axe, coin arrière relevé
+    e2 = normalize(np.cross(out, e1))
+    if e2 @ u < 0:
+        e2 = -e2
+    L, Hh, D = 0.55 * S, 0.33 * S, 0.2 * S
+
+    # Amande : anneaux le long du grand axe.
+    rings = [c - e1 * L]
+    for x, k in ((-0.55, 0.75), (0.0, 1.0), (0.55, 0.75)):
+        ang = np.arange(8) * np.pi / 4
+        rings.append(np.array([c + e1 * L * x + e2 * np.sin(t) * Hh * k + out * np.cos(t) * D * k for t in ang]))
+    rings.append(c + e1 * L)
+    a.add("Eyes", *loft(rings))
+
+    # Pupille fendue, verticale, posée sur l'œil.
+    a.add("Pupils", *gem(c + out * D * 0.95 + e1 * L * 0.1, e1, e2, out, 0.075 * S, Hh * 0.85, 0.06 * S))
+
+    # Paupière du haut : bourrelet qui couvre le tiers supérieur, plus lourd vers l'arrière.
+    lid = [c + e1 * L * x + e2 * Hh * (0.55 + 0.25 * (1 - abs(x))) + out * D * (0.35 + 0.4 * (1 - abs(x)))
+           - e2 * Hh * 0.25 * max(0.0, -x)
+           for x in np.linspace(-1.15, 1.1, 7)]
+    a.add("Body", *tube(lid, [0.06, 0.15, 0.2, 0.2, 0.17, 0.12, 0.05], 6, up=out))
+    # Petite paupière du bas.
+    low = [c + e1 * L * x - e2 * Hh * (0.8 + 0.1 * abs(x)) + out * D * 0.4 for x in np.linspace(-0.9, 0.8, 5)]
+    a.add("Body", *tube(low, [0.03, 0.08, 0.09, 0.07, 0.02], 5, up=out))
+
+    # Arcade en relief au-dessus de l'œil, et 2 mèches rouges vers l'arrière.
+    brow = [P(2.25, 0.95, 1.2 * sd), P(1.6, 1.2, 1.45 * sd), P(0.8, 1.3, 1.5 * sd), P(0.1, 1.15, 1.4 * sd)]
+    a.add("Body", *tube(brow, [0.12, 0.26, 0.26, 0.12], 6))
+    for x0, h in ((1.4, 0.9), (0.6, 1.15)):
+        a.add("Fins", *fin(P(x0 + 0.4, 1.3, 1.45 * sd), P(x0 - 0.4, 1.3, 1.5 * sd),
+                           P(x0 - 1.2, 1.3 + h, 1.85 * sd), normalize(side_v - u * 0.3), 0.14))
 
 
 def build_head(a, neck, neck_r):
@@ -174,11 +264,10 @@ def build_head(a, neck, neck_r):
         b0 = jaw_point(3.6, -0.7, 0.62 * side)
         a.add("Horns", *tube([b0, b0 + u * 0.35 * S, b0 + u * 0.6 * S - f * 0.05], [0.12, 0.07, 0.0], 4))
 
-    # Yeux qui brillent + arcades.
+    # Yeux : amande dorée qui brille, pupille fendue, paupière du haut qui donne le regard
+    # (entre mignon et féroce), arcade en relief et 2 petites mèches rouges au-dessus.
     for side in (1, -1):
-        a.add("Eyes", *gem(P(1.4, 0.55, 1.55 * side), f, u, s * side, 0.4 * S, 0.22 * S, 0.18 * S))
-        brow_a, brow_b = P(0.9, 1.05, 1.35 * side), P(2.0, 0.9, 1.25 * side)
-        a.add("Fins", *fin(brow_a, brow_b, P(0.2, 1.75, 1.8 * side), s * side, 0.25))
+        build_eye(a, P, f, u, s * side, S)
 
     # Cornes en bois de cerf, vers l'arrière, avec une branche.
     for side in (1, -1):
@@ -215,7 +304,7 @@ def build_head(a, neck, neck_r):
 
 
 def build():
-    a = Asset("Dragon_Long_v1")
+    a = Asset("Dragon_Long_v2")
     for name, (color, mat) in COULEURS.items():
         a.part(name, color, mat)
     pts = catmull_rom(SPINE, RINGS)
@@ -223,6 +312,8 @@ def build():
     t = np.linspace(0, 1, RINGS)
     radii = np.array([body_radius(x) for x in t])
     build_body(a, pts, T, N, B, radii)
+    build_scales(a, pts, T, N, B, radii)
+    build_belly_plates(a, pts, T, N, B, radii)
     build_spines(a, pts, T, N, B, radii)
     build_legs(a, pts, T, N, B, radii)
     build_head(a, pts[0], radii[0])
