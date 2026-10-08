@@ -36,6 +36,20 @@ class Asset:
         p["v"].extend(verts.tolist())
         p["f"].extend((faces + base).tolist())
 
+    def add_split(self, verts, faces, labels):
+        """Ajoute un volume fermé dont les faces vont dans plusieurs parties (une même peau, plusieurs couleurs)."""
+        verts = np.asarray(verts, float)
+        faces = np.asarray(faces, int)
+        a, b, c = verts[faces[:, 0]], verts[faces[:, 1]], verts[faces[:, 2]]
+        if np.einsum("ij,ij->i", a, np.cross(b, c)).sum() < 0:
+            faces = faces[:, ::-1]
+        labels = np.asarray(labels)
+        for name in np.unique(labels):
+            p = self.parts[name]
+            base = len(p["v"])
+            p["v"].extend(verts.tolist())
+            p["f"].extend((faces[labels == name] + base).tolist())
+
     def tri_count(self):
         return sum(len(p["f"]) for p in self.parts.values())
 

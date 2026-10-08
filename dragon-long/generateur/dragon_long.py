@@ -1,7 +1,8 @@
 # Dragon Long (dragon chinois) stylisé, low-poly.
 # v1 : premier croquis. v2 : écailles en relief sur le dos, plaques sur le ventre, crête plus fournie, yeux retravaillés.
 # v3 : tête plus grande et sculptée (nez de félin, sourcils dorés en volutes, barbichette, joues, rides du museau).
-# v5 : gueule avec intérieur sombre, palais, langue et vraies rangées de dents ; yeux avancés pour être vus de face.
+# v5 : nouveau nez (seul changement) : truffe large en 2 lobes, sillon, grosses narines à bourrelet, coussinets
+#      de lèvre, chanfrein court à plis et petites écailles.
 # v4 : nez fondu dans le crâne (truffe, coussinets et sillon sculptés dans la même peau), yeux enfoncés dans des orbites.
 # Corps de serpent en S, ventre doré, crinière et nageoires rouges, cornes en bois de cerf,
 # moustaches, 4 pattes à 3 griffes. Repère Roblox : Y en haut, 1 unité = 1 stud, la tête regarde vers +Z.
@@ -15,9 +16,7 @@ COULEURS = {
     "Horns": ("#E6DCC3", "SmoothPlastic"),     # cornes, griffes, dents
     "Whiskers": ("#F0C24B", "SmoothPlastic"),  # moustaches
     "Eyes": ("#FFD23F", "Neon"),               # yeux qui brillent
-    "Pupils": ("#17120E", "SmoothPlastic"),    # pupilles fendues, narines
-    "Mouth": ("#3A1013", "SmoothPlastic"),     # intérieur de la gueule, palais, gencives
-    "Tongue": ("#B9434C", "SmoothPlastic"),    # langue
+    "Pupils": ("#17120E", "SmoothPlastic"),    # pupilles fendues
 }
 
 SIDES = 8          # côtés du corps (8 = bien facetté, léger pour téléphone)
@@ -183,12 +182,12 @@ def build_eye(a, P, f, u, side_v, S):
     sd = 1 if side_v @ np.cross(u, f) > 0 else -1
     ex, ey = EYE
     c = P(ex, ey, (skull_side(ex, ey) + 0.02) * sd)              # posé au fond de l'orbite
-    out = normalize(side_v + f * 0.95 + u * 0.12)             # l'œil regarde vers l'avant : visible de face
+    out = normalize(side_v + f * 0.45 + u * 0.1)              # l'œil regarde un peu vers l'avant
     e1 = normalize(f - out * (f @ out) - u * 0.22)            # grand axe, coin arrière relevé
     e2 = normalize(np.cross(out, e1))
     if e2 @ u < 0:
         e2 = -e2
-    L, Hh, D = 0.6 * S, 0.37 * S, 0.21 * S
+    L, Hh, D = 0.55 * S, 0.33 * S, 0.2 * S
 
     # Amande : anneaux le long du grand axe.
     rings = [c - e1 * L]
@@ -223,12 +222,16 @@ SKULL = [
     (2.6, 0.08, 1.22, 0.95, 0.95),
     (3.3, 0.02, 1.15, 0.88, 0.85),
     (3.9, -0.02, 1.1, 0.84, 0.8),
-    (4.3, -0.05, 0.98, 0.76, 0.72),
-    (4.55, -0.07, 0.78, 0.64, 0.58),
-    (4.72, -0.08, 0.5, 0.44, 0.38),
+    (4.25, -0.04, 1.03, 0.79, 0.76),
+    (4.45, -0.05, 0.99, 0.77, 0.74),   # bord de la face avant du museau (la truffe est sculptée dedans)
 ]
+NOSE_X = 4.45     # x du bord de la face avant
+SIDES_HEAD = 32   # côtés du crâne (multiple de 4 : sommets pile sur le dessus, le dessous et les côtés)
 SUPER = 2.6   # > 2 : section plus carrée, joues pleines
-EYE = (1.78, 0.55)  # centre de l'œil (x, y) dans le repère de la tête
+EYE = (1.5, 0.5)  # centre de l'œil (x, y) dans le repère de la tête
+
+
+FOLDS = (2.93, 3.32, 3.7)   # crêtes des plis du chanfrein
 
 
 def gauss(v):
@@ -251,11 +254,11 @@ def relief(x, y, side_w, top_w=0.0):
     d += 0.22 * gauss(np.hypot((x - ex - 0.1) / 0.8, (y - ey - 0.58) / 0.2)) * side_w
     # Pommette sous l'orbite, qui file vers l'arrière.
     d += 0.1 * gauss(np.hypot((x - ex + 0.4) / 0.9, (y - ey + 0.62) / 0.22)) * side_w
-    # Coussinets des moustaches, gonflés de chaque côté du museau (comme un tigre).
-    d += 0.3 * gauss(np.hypot((x - 4.05) / 0.5, (y + 0.3) / 0.36)) * side_w
-    # Arête du nez : léger creux, puis la truffe qui se relève au bout.
-    d -= 0.07 * gauss((x - 4.0) / 0.22) * top_w
-    d += 0.12 * gauss((x - 4.5) / 0.22) * top_w
+    # Coussinets de lèvre : leur bord extérieur déborde un peu sur les côtés du museau.
+    d += 0.16 * gauss(np.hypot((x - 4.1) / 0.4, (y + 0.4) / 0.3)) * side_w
+    # Chanfrein : 3 plis en travers (bourrelet suivi d'un creux), qui s'estompent sur les côtés.
+    for xc in FOLDS:
+        d += (0.075 * gauss((x - xc) / 0.06) - 0.055 * gauss((x - xc + 0.1) / 0.06)) * top_w
     return d
 
 
@@ -278,12 +281,51 @@ def skull_point(x, t):
     nn = np.hypot(nz, ny) or 1.0
     nz, ny = nz / nn, ny / nn
     d = relief(x, yc + y, abs(nz) ** 1.5, max(0.0, ny) ** 2)
-    # Avant du museau : la truffe déborde en haut, les coussinets avancent, le sillon recule au milieu.
-    front = smoothstep(4.0, 4.72, x)
-    dx = 0.3 * front * max(0.0, st) ** 1.3
-    dx += 0.14 * front * np.clip(-st * abs(ct) * 2.2, 0, 1)
-    dx -= 0.18 * front * gauss(ct / 0.22) * max(0.0, -st)
-    return np.array([x + dx, yc + y + ny * d, z + nz * d])
+    return np.array([x, yc + y + ny * d, z + nz * d])
+
+
+# ---------- face avant du museau : truffe, narines, coussinets ----------
+# Coordonnées normalisées de la face avant : u de -1 (côté droit) à 1 (côté gauche), v de -1 (bas) à 1 (haut).
+NOSTRIL = (0.37, 0.33, 0.23)   # centre u, v et rayon des narines
+
+
+def nose_shape(u, v, r):
+    """Avancée (en studs) de la face avant au point (u, v) ; r = 0 au centre, 1 sur le bord.
+    Renvoie aussi la distance normalisée au centre de la narine la plus proche (< 1 : dans la narine)."""
+    nu, nv, nr = NOSTRIL
+    dome = 0.26 * np.sqrt(max(0.0, 1 - r * r))                       # museau arrondi, pas pointu
+    # Truffe : une seule masse ovale, large et bombée (plus large que haute), en haut de la face.
+    feat = 0.3 * gauss(np.hypot(u / 0.66, (v - 0.32) / 0.42))
+    # Coussinets de lèvre : une masse plus basse, gonflée, sous la truffe.
+    feat += 0.24 * gauss(np.hypot(u / 0.72, (v + 0.52) / 0.32))
+    # Sillon vertical au milieu : coupe la truffe en 2 lobes et descend entre les 2 coussinets.
+    feat -= 0.24 * gauss(u / 0.1) * smoothstep(-1.05, -0.85, v) * (1 - smoothstep(0.75, 0.98, v))
+    # Narines rondes : bourrelet épais autour, creux profond dedans.
+    dn = min(np.hypot(u - nu, v - nv), np.hypot(u + nu, v - nv)) / nr
+    feat += 0.12 * gauss((dn - 1.15) / 0.45)
+    feat -= 0.38 * max(0.0, 1 - dn * dn) ** 0.7
+    return dome + feat * (1 - smoothstep(0.7, 1.0, r)), dn
+
+
+def unit_dir(t):
+    ct, st = np.cos(t), np.sin(t)
+    return np.sign(ct) * abs(ct) ** (2 / SUPER), np.sign(st) * abs(st) ** (2 / SUPER)
+
+
+def front_point(t, r):
+    """Point de la face avant : anneau de rayon r (1 = bord, 0 = centre) à l'angle t. Renvoie (point, dn)."""
+    yc = skull_section(NOSE_X)[0]
+    rim = skull_point(NOSE_X, t)
+    un, vn = unit_dir(t)
+    dx, dn = nose_shape(r * un, r * vn, r)
+    return np.array([NOSE_X + dx, yc + (rim[1] - yc) * r, rim[2] * r]), dn
+
+
+def front_point_uv(u, v):
+    """Même chose à partir de (u, v) : sert à poser les moustaches sur les coussinets."""
+    r = (abs(u) ** SUPER + abs(v) ** SUPER) ** (1 / SUPER)
+    t = np.arctan2(np.sign(v) * abs(v / r) ** (SUPER / 2), np.sign(u) * abs(u / r) ** (SUPER / 2))
+    return front_point(t, r)[0]
 
 
 def skull_side(x, y):
@@ -315,24 +357,43 @@ def build_head(a, neck, neck_r):
     def on_skin(x, y, side, lift=0.04):
         return P(x, y, side * (skull_side(x, y) + lift))
 
-    # Crâne + museau d'un seul tenant (truffe, coussinets, sillon et orbites sculptés dans la même peau).
-    xs = np.concatenate([np.linspace(-1.4, 0.6, 5), np.linspace(0.85, 2.3, 8), np.linspace(2.6, 3.8, 4),
-                         np.linspace(3.95, 4.72, 7)])
-    angs = np.pi / 24 + np.arange(24) * 2 * np.pi / 24
-    a.add("Body", *loft([np.array([P(*skull_point(x, t)) for t in angs]) for x in xs]))
+    # Crâne + museau d'un seul tenant : les côtés, puis la face avant en anneaux concentriques jusqu'au bout
+    # du nez. Truffe, sillon, narines et coussinets sont sculptés dans cette même peau (rien de collé).
+    xs = np.concatenate([np.linspace(-1.4, 0.6, 3), np.linspace(0.85, 2.3, 7),
+                         [2.65, 2.83, 2.93, 3.08, 3.22, 3.32, 3.47, 3.6, 3.7, 4.0, 4.25, NOSE_X]])
+    angs = np.arange(SIDES_HEAD) * 2 * np.pi / SIDES_HEAD
+    rings = [np.array([P(*skull_point(x, t)) for t in angs]) for x in xs]
+    dns = [np.full(SIDES_HEAD, 9.0) for _ in xs]
+    # Anneaux plus serrés à la hauteur des narines, pour qu'elles restent bien rondes.
+    for rr in (0.96, 0.88, 0.79, 0.71, 0.64, 0.57, 0.5, 0.43, 0.36, 0.28, 0.18, 0.08):
+        pts = [front_point(t, rr) for t in angs]
+        rings.append(np.array([P(*p) for p, _ in pts]))
+        dns.append(np.array([d for _, d in pts]))
+    tip, _ = front_point(0.0, 0.0)
+    rings.append(P(*tip)[None])
+    dns.append(np.array([0.0 if abs(NOSTRIL[0]) < NOSTRIL[2] else 9.0]))
+    verts, faces = loft(rings)
+    dn = np.concatenate(dns + [[9.0]])                       # + centre du bouchon arrière
+    # L'intérieur des narines (le creux) prend la couleur sombre des pupilles.
+    inside = dn[faces].max(axis=1) < 0.95
+    a.add_split(verts, faces, np.where(inside, "Pupils", "Body"))
 
-    # Narines en virgule, creusées dans le haut de la truffe.
-    for side in (1, -1):
-        rim = skull_point(4.72, np.pi / 2 - side * 0.9)
-        n0 = P(*(rim * 0.72 + np.array([4.86, 0.05, 0.0]) * 0.28))
-        a.add("Pupils", *gem(n0, normalize(f * 0.9 + s * side * 0.3), u, normalize(s * side - f * 0.3),
-                             0.09 * S, 0.12 * S, 0.2 * S))
-
-    # Rides du chanfrein (le « grognement » des félins) : 3 bourrelets en arc sur le museau.
-    for x in (2.55, 2.95, 3.35):
-        arc = [P(x + 0.06 * abs(np.cos(t)), skull_top(x) * np.sin(t) * 0.97 + 0.02 * (1 - np.sin(t)),
-                 skull_side(x, 0.3) * np.cos(t) * 0.92) for t in np.linspace(np.radians(35), np.radians(145), 7)]
-        a.add("Body", *tube(arc, [0.0, 0.07, 0.1, 0.11, 0.1, 0.07, 0.0], 5))
+    # Petites écailles sur le chanfrein, de plus en plus petites, qui disparaissent avant la truffe.
+    for x, n, size in ((1.95, 4, 0.2), (2.25, 3, 0.17), (2.55, 4, 0.13), (2.78, 3, 0.1), (3.15, 2, 0.07), (3.52, 2, 0.045)):
+        for k in range(n):
+            t = np.pi / 2 + (k - (n - 1) / 2) * 0.32
+            p0 = skull_point(x, t)
+            dxp = skull_point(x + 0.05, t) - skull_point(x - 0.05, t)
+            dtp = skull_point(x, t + 0.05) - skull_point(x, t - 0.05)
+            nrm = normalize(np.cross(dxp, dtp))
+            if nrm[1] < 0:
+                nrm = -nrm
+            back, side_v = np.array([-1.0, 0, 0]), normalize(dtp)
+            L, W, H = size * 1.5, size * 1.1, size * 0.45
+            sink = -nrm * size * 0.25
+            loc = [p0 - back * L * 0.45 + sink, p0 + side_v * W / 2 + sink, p0 + back * L * 0.55 + sink,
+                   p0 - side_v * W / 2 + sink, p0 + back * L * 0.25 + nrm * H]
+            a.add("Body", [P(*q) for q in loc], [(0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4), (0, 3, 2), (0, 2, 1)])
 
     # Mâchoire du bas, entrouverte de 20°.
     hinge = np.array([0.4, -0.55])
@@ -362,89 +423,15 @@ def build_head(a, neck, neck_r):
         low = [jaw_point(x, -0.62, w * side) for x, w in ((0.9, 1.15), (2.0, 1.02), (3.0, 0.92), (3.9, 0.72))]
         a.add("Body", *tube(low, [0.05, 0.1, 0.1, 0.04], 5))
 
-    def jaw_up(x):
-        return normalize(jaw_point(x, 0.0, 0.0) - jaw_point(x, -1.0, 0.0))
-
-    def jaw_top(x):
-        return np.interp(x, [0.2, 1.6, 3.0, 3.8, 4.15], [-0.43, -0.59, -0.63, -0.6, -0.7])
-
-    # Intérieur de la gueule : la gorge sombre au fond, un palais fin en haut et un plancher fin en bas.
-    # La langue repose sur le plancher. On ne voit plus « à travers » la gueule.
-    def mouth_w(x):
-        yc, w, ht, hb = skull_section(x)
-        return min(w, 1.15) * (0.82 if x < 3.6 else 0.62)
-
-    rings = []
-    for x in (-0.2, 0.6, 1.2):
-        yc, w, ht, hb = skull_section(x)
-        top_y, bot_y, wz = yc - hb + 0.12, jaw_top(x) - 0.08, mouth_w(x)
-        rings.append(np.array([P(x, top_y, wz * 0.55), P(x, top_y + 0.04, 0.0), P(x, top_y, -wz * 0.55),
-                               P(x, top_y - 0.15, -wz), jaw_point(x, bot_y + 0.12, -wz),
-                               jaw_point(x, bot_y, -wz * 0.55), jaw_point(x, bot_y - 0.04, 0.0),
-                               jaw_point(x, bot_y, wz * 0.55), jaw_point(x, bot_y + 0.12, wz), P(x, top_y - 0.15, wz)]))
-    a.add("Mouth", *loft(rings))
-    palate, floor = [], []
-    for x in (0.9, 1.8, 2.8, 3.55, 3.95):
-        yc, w, ht, hb = skull_section(x)
-        y0, wz = yc - hb, mouth_w(x)
-        palate.append(np.array([P(x, y0 + 0.12, wz), P(x, y0 + 0.12, -wz), P(x, y0 - 0.1, -wz * 0.95),
-                                P(x, y0 - 0.06, 0.0), P(x, y0 - 0.1, wz * 0.95)]))
-        if x < 3.9:
-            j0 = jaw_top(x)
-            floor.append(np.array([jaw_point(x, j0 - 0.2, wz * 0.9), jaw_point(x, j0 - 0.2, -wz * 0.9),
-                                   jaw_point(x, j0 + 0.04, -wz * 0.85), jaw_point(x, j0, 0.0),
-                                   jaw_point(x, j0 + 0.04, wz * 0.85)]))
-    a.add("Mouth", *loft(palate))
-    a.add("Mouth", *loft(floor))
-    # Palais : 4 bourrelets en travers, visibles quand on regarde dans la gueule.
-    for x in (1.6, 2.2, 2.8, 3.35):
-        yc, w, ht, hb = skull_section(x)
-        y0 = yc - hb + 0.1
-        ridge = [P(x + 0.12, y0, -0.62), P(x - 0.08, y0 - 0.06, -0.3), P(x - 0.12, y0 - 0.08, 0.0),
-                 P(x - 0.08, y0 - 0.06, 0.3), P(x + 0.12, y0, 0.62)]
-        a.add("Mouth", *tube(ridge, [0.0, 0.08, 0.09, 0.08, 0.0], 5))
-
-    # Langue : large et plate sur le plancher, le bout qui se relève et se fend en deux.
-    tongue = [jaw_point(x, jaw_top(x) + lift, 0.0) for x, lift in
-              ((0.6, 0.2), (1.5, 0.21), (2.4, 0.22), (3.1, 0.25), (3.55, 0.38))]
-    tl = catmull_rom(tongue, 9)
-    a.add("Tongue", *tube(tl, [0.4, 0.46, 0.48, 0.47, 0.44, 0.4, 0.35, 0.3, 0.24], 8, tip=False,
-                          up=jaw_up(2.0), flat=0.38))
+    # Dents : crocs en haut, plus petites dents, et 2 crocs en bas.
+    for x, z, L in ((3.85, 0.85, 0.8), (3.35, 0.98, 0.35), (2.85, 1.05, 0.32), (2.3, 1.12, 0.3)):
+        for side in (1, -1):
+            top = P(x, -0.7, z * side)
+            a.add("Horns", *tube([top, P(x + 0.05, -0.7 - L * 0.6, z * side * 0.97), P(x + 0.12, -0.7 - L, z * side * 0.95)],
+                                 [0.14 if L > 0.5 else 0.09, 0.07, 0.0], 4))
     for side in (1, -1):
-        b0 = tl[-1]
-        fork = [b0, b0 + (f * 0.25 + s * side * 0.12) * S + jaw_up(3.6) * 0.12 * S,
-                b0 + (f * 0.45 + s * side * 0.25) * S + jaw_up(3.6) * 0.32 * S]
-        a.add("Tongue", *tube(fork, [0.15, 0.1, 0.0], 6, up=jaw_up(3.6), flat=0.5))
-
-    # Dents du haut : une rangée le long de la mâchoire, un gros croc, et des incisives sous le nez.
-    def upper_tooth(x, z, L, r):
-        top = P(x, -0.66, z)
-        bend = 0.97 if z else 1.0
-        a.add("Horns", *tube([top, P(x + 0.04, -0.66 - L * 0.6, z * bend), P(x + 0.1, -0.66 - L, z * bend * 0.98)],
-                             [r, r * 0.55, 0.0], 4))
-
-    for side in (1, -1):
-        for x in np.arange(1.25, 3.6, 0.32):
-            yc, w, ht, hb = skull_section(x)
-            upper_tooth(x, side * min(w, 1.2) * 0.9, 0.24 + 0.06 * ((x * 3.1) % 1), 0.08)
-        upper_tooth(3.85, 0.85 * side, 0.85, 0.15)                         # croc
-        for z in (0.2, 0.48):
-            upper_tooth(4.3 - z * 0.35, z * side, 0.22, 0.07)              # incisives
-    # Dents du bas : rangée sur la mâchoire, 2 crocs, incisives devant.
-    for side in (1, -1):
-        for x in np.arange(1.4, 3.4, 0.36):
-            w = np.interp(x, [0.2, 1.6, 3.0, 3.8], [1.25, 1.08, 0.95, 0.82]) * 0.82
-            b0 = jaw_point(x, jaw_top(x) - 0.02, w * side)
-            L = 0.2 + 0.05 * ((x * 2.3) % 1)
-            a.add("Horns", *tube([b0, b0 + jaw_up(x) * L * 0.6 * S, b0 + (jaw_up(x) * L - f * 0.04) * S],
-                                 [0.075, 0.04, 0.0], 4))
         b0 = jaw_point(3.55, -0.65, 0.66 * side)
-        a.add("Horns", *tube([b0, b0 + jaw_up(3.55) * 0.4 * S, b0 + (jaw_up(3.55) * 0.68 - f * 0.05) * S],
-                             [0.14, 0.07, 0.0], 4))
-        for z in (0.18, 0.4):
-            b0 = jaw_point(4.0 - z * 0.3, -0.72, z * side)
-            a.add("Horns", *tube([b0, b0 + jaw_up(4.0) * 0.14 * S, b0 + jaw_up(4.0) * 0.24 * S + f * 0.03 * S],
-                                 [0.065, 0.035, 0.0], 4))
+        a.add("Horns", *tube([b0, b0 + u * 0.38 * S, b0 + u * 0.65 * S - f * 0.05], [0.13, 0.07, 0.0], 4))
 
     # Yeux : amande dorée qui brille, pupille fendue, paupières.
     for side in (1, -1):
@@ -509,7 +496,7 @@ def build_head(a, neck, neck_r):
 
     # Moustaches longues et ondulées, qui partent des coussinets du museau.
     for side in (1, -1):
-        pts = [P(4.1, -0.25, 1.05 * side), P(3.9, -0.35, 2.2 * side), P(2.8, -0.8, 3.4 * side),
+        pts = [P(*front_point_uv(0.66 * side, -0.48)), P(3.9, -0.35, 2.2 * side), P(2.8, -0.8, 3.4 * side),
                P(1.0, -0.45, 4.3 * side), P(-0.9, -1.05, 4.9 * side), P(-2.8, -0.65, 5.3 * side)]
         a.add("Whiskers", *tube(catmull_rom(pts, 14), np.linspace(0.16, 0.0, 14), 4))
 

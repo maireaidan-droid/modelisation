@@ -5,9 +5,12 @@ ventre doré, crinière et épines rouges, cornes en bois de cerf, moustaches, 4
 
 ![aperçu v5](apercu-Dragon_Long_v5.png)
 
+Comparaison du nez v4 / v5 : [comparaison-nez-Dragon_Long_v4-Dragon_Long_v5.png](comparaison-nez-Dragon_Long_v4-Dragon_Long_v5.png)
+
 | Version | Fichier | Triangles | Nouveautés |
 |---|---|---|---|
-| **v5** (actuelle) | `objets/Dragon_Long_v5.glb` | 12 928 | gueule habitée : gorge sombre, palais à bourrelets, langue fendue, rangées de dents en haut et en bas avec incisives ; yeux plus grands et tournés vers l'avant pour être vus de face |
+| **v5** (actuelle) | `objets/Dragon_Long_v5.glb` | 12 952 | à partir de la v4, **seul le nez change** : truffe large et bombée fondue dans le crâne, sillon vertical qui la sépare en 2 lobes, 2 grosses narines rondes avec bourrelet et creux sombre, coussinets de lèvre d'où partent les moustaches, chanfrein court avec 3 plis et des écailles qui rapetissent jusqu'à disparaître |
+| v5_gueule (essai mis de côté) | `objets/Dragon_Long_v5_gueule.glb` | 12 928 | gueule habitée : gorge sombre, palais à bourrelets, langue fendue, rangées de dents en haut et en bas avec incisives ; yeux plus grands et tournés vers l'avant pour être vus de face ([aperçu](apercu-Dragon_Long_v5_gueule.png)) — pas reprise dans la v5 |
 | v4 | `objets/Dragon_Long_v4.glb` | 11 986 | nez fondu dans le crâne : truffe, coussinets et sillon sculptés dans la même peau ; yeux enfoncés dans des orbites sous une arcade, avec pommettes ([aperçu](apercu-Dragon_Long_v4.png)) |
 | v3 | `objets/Dragon_Long_v3.glb` | 11 396 | tête plus grande (×1,3) et sculptée : nez de félin (truffe, narines, coussinets des moustaches, rides du chanfrein), sourcils dorés en volutes, barbichette, pommettes et joues en flammes, lèvres, marque dorée sur le front ([aperçu](apercu-Dragon_Long_v3.png)) |
 | v2 | `objets/Dragon_Long_v2.glb` | 8 896 | écailles en relief sur le dos, plaques sur le ventre, crête de triangles plus fournie, yeux en amande avec pupille fendue, paupières et arcades ([aperçu](apercu-Dragon_Long_v2.png)) |
@@ -24,13 +27,18 @@ ventre doré, crinière et épines rouges, cornes en bois de cerf, moustaches, 4
 | Horns (cornes, griffes, dents) | `#E6DCC3` ivoire | SmoothPlastic |
 | Whiskers (moustaches ; à partir de la v3, aussi les sourcils et la marque du front) | `#F0C24B` or | SmoothPlastic |
 | Eyes | `#FFD23F` | **Neon** |
-| Pupils (pupilles ; à partir de la v3, aussi les narines) | `#17120E` presque noir | SmoothPlastic |
-| Mouth (v5 : gorge, palais) | `#3A1013` rouge très sombre | SmoothPlastic |
-| Tongue (v5 : langue) | `#B9434C` rouge rosé | SmoothPlastic |
+| Pupils (pupilles ; à partir de la v3, aussi les narines ; en v5, le creux des narines) | `#17120E` presque noir | SmoothPlastic |
+| Mouth (v5_gueule : gorge, palais) | `#3A1013` rouge très sombre | SmoothPlastic |
+| Tongue (v5_gueule : langue) | `#B9434C` rouge rosé | SmoothPlastic |
 
 ## Import dans Roblox Studio
 **Avatar → Import 3D**, unité **Stud**, parties séparées. Le pivot est sous le dragon (Y = 0) et la tête regarde vers +Z.
 Pour les nageoires, mettre `DoubleSided = true` si elles disparaissent sous certains angles.
+
+## Comparer deux versions
+```
+cd dragon-long/generateur && python compare.py Dragon_Long_v4 Dragon_Long_v5
+```
 
 ## Régénérer
 ```
