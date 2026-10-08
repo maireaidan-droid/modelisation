@@ -1,6 +1,7 @@
 # Dragon Long (dragon chinois) stylisé, low-poly.
 # v1 : premier croquis. v2 : écailles en relief sur le dos, plaques sur le ventre, crête plus fournie, yeux retravaillés.
 # v3 : tête plus grande et sculptée (nez de félin, sourcils dorés en volutes, barbichette, joues, rides du museau).
+# v15 : intérieur de la gueule tapissé d'un rouge uniforme (gorge, palais, plancher, gencives le long des dents).
 # v14 : peau du visage en écailles couchées (plaques presque à plat, bord arrière à peine soulevé) au lieu de pointes.
 # v13 : mâchoire du bas un peu affinée ; peau du visage : écailles-tuiles graduées sur le front et le chanfrein qui
 #       se changent en galets (peau granuleuse) sur les joues et autour des yeux, truffe et lèvres lisses avec
@@ -30,7 +31,7 @@ COULEURS = {
     "Whiskers": ("#F0C24B", "SmoothPlastic"),  # moustaches
     "Eyes": ("#FFD23F", "Neon"),               # yeux qui brillent
     "Pupils": ("#17120E", "SmoothPlastic"),    # pupilles fendues, narines
-    "Mouth": ("#3A1013", "SmoothPlastic"),     # intérieur de la gueule, palais
+    "Mouth": ("#8E2529", "SmoothPlastic"),     # intérieur de la gueule : gorge, palais, plancher, gencives
     "Tongue": ("#B9434C", "SmoothPlastic"),    # langue
 }
 
@@ -662,10 +663,10 @@ def build_head(a, neck, neck_r):
                                 P(x, y0 - 0.06, 0.0), P(x, y0 - 0.1, wz * 0.95)]))
         if x < 3.9:
             j0 = jaw_top(x)
-            jw = np.interp(x, [j[0] for j in JAW], [j[3] for j in JAW]) * muzzle_w(x) * 0.72   # dans la mâchoire
-            floor.append(np.array([jaw_point(x, j0 - 0.2, jw * 0.9), jaw_point(x, j0 - 0.2, -jw * 0.9),
-                                   jaw_point(x, j0 + 0.04, -jw), jaw_point(x, j0, 0.0),
-                                   jaw_point(x, j0 + 0.04, jw)]))
+            jw = np.interp(x, [j[0] for j in JAW], [j[3] for j in JAW]) * muzzle_w(x) * 0.8    # jusqu'aux dents
+            floor.append(np.array([jaw_point(x, j0 - 0.22, jw), jaw_point(x, j0 - 0.22, -jw),
+                                   jaw_point(x, j0 + 0.05, -jw * 0.95), jaw_point(x, j0 + 0.01, 0.0),
+                                   jaw_point(x, j0 + 0.05, jw * 0.95)]))
     a.add("Mouth", *loft(palate))
     a.add("Mouth", *loft(floor))
     # Palais : 4 bourrelets en travers, visibles quand on regarde dans la gueule.
@@ -687,6 +688,19 @@ def build_head(a, neck, neck_r):
         fork = [b0, b0 + (f * 0.25 + s * side * 0.12) * S + jaw_up(3.6) * 0.12 * S,
                 b0 + (f * 0.45 + s * side * 0.25) * S + jaw_up(3.6) * 0.32 * S]
         a.add("Tongue", *tube(fork, [0.15, 0.1, 0.0], 6, up=jaw_up(3.6), flat=0.5))
+
+    # Gencives rouges le long des 2 rangées de dents : plus de peau verte visible dans la gueule.
+    for side in (1, -1):
+        up_g = []
+        for x in np.linspace(0.9, 4.15, 12):
+            yc, w, ht, hb = skull_section(x)
+            up_g.append(P(x, -0.68 + jaw_lift(x), side * min(w, 1.2) * 0.86))
+        a.add("Mouth", *tube(up_g, [0.0] + [0.12] * 10 + [0.0], 6))
+        lo_g = []
+        for x in np.linspace(1.0, 4.0, 11):
+            w = np.interp(x, [0.2, 1.6, 3.0, 3.8], [1.25, 1.08, 0.95, 0.82]) * 0.82 * muzzle_w(x)
+            lo_g.append(jaw_point(x, jaw_top(x) + 0.02, w * side * 0.98))
+        a.add("Mouth", *tube(lo_g, [0.0] + [0.11] * 9 + [0.0], 6))
 
     # Dentition acérée : dents fines à 3 faces (arêtes tranchantes), recourbées vers la gorge,
     # longues et courtes en alternance, crocs en poignard et incisives pointues devant.
@@ -804,7 +818,7 @@ def build_head(a, neck, neck_r):
 
 
 def build():
-    a = Asset("Dragon_Long_v14")
+    a = Asset("Dragon_Long_v15")
     for name, (color, mat) in COULEURS.items():
         a.part(name, color, mat)
     pts = catmull_rom(SPINE, RINGS)

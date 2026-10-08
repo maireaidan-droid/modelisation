@@ -1,7 +1,7 @@
-# Dragon Long v14 : import dans Roblox Studio (instructions pour une session Claude locale)
+# Dragon Long v15 : import dans Roblox Studio (instructions pour une session Claude locale)
 
 > **À coller tel quel dans une NOUVELLE conversation Claude locale** (connectée à Roblox Studio par MCP),
-> après avoir importé le fichier `Dragon_Long_v14.glb` (voir « Import »).
+> après avoir importé le fichier `Dragon_Long_v15.glb` (voir « Import »).
 
 ---
 
@@ -19,9 +19,9 @@ Parle en **français**, simplement, et explique ce que tu fais.
 ## Le modèle
 | | |
 |---|---|
-| Fichier | `Dragon_Long_v14.glb` (branche `claude/roblox-3d-dragons-t7lch1` du dépôt `maireaidan-droid/modelisation`, dossier `dragon-long/objets/`) |
+| Fichier | `Dragon_Long_v15.glb` (branche `claude/roblox-3d-dragons-t7lch1` du dépôt `maireaidan-droid/modelisation`, dossier `dragon-long/objets/`) |
 | Taille attendue | **14,5 × 19,2 × 58 studs** (largeur × hauteur × longueur) |
-| Triangles | environ 20 700 au total |
+| Triangles | environ 21 200 au total |
 | Orientation | la **tête regarde vers +Z**, le pivot est **sous le dragon** (Y = 0), centré |
 
 ### Les 9 parties et leurs réglages
@@ -34,11 +34,11 @@ Parle en **français**, simplement, et explique ce que tu fais.
 | `Whiskers` | moustaches, sourcils en volutes, marque du front | `#F0C24B` (or) | SmoothPlastic | 1 288 |
 | `Eyes` | yeux | `#FFD23F` (jaune) | **Neon** | 96 |
 | `Pupils` | pupilles fendues, narines, pores du museau | `#17120E` (presque noir) | SmoothPlastic | 112 |
-| `Mouth` | gorge, palais | `#3A1013` (rouge très sombre) | SmoothPlastic | 270 |
+| `Mouth` | intérieur de la gueule : gorge, palais, plancher, gencives | `#8E2529` (rouge) | SmoothPlastic | 726 |
 | `Tongue` | langue | `#B9434C` (rouge rosé) | SmoothPlastic | 192 |
 
 ## Import (fait par moi, à la main)
-1. Dans Studio : **Avatar → Import 3D** (ou **Fichier → Import 3D**), puis choisir `Dragon_Long_v14.glb`.
+1. Dans Studio : **Avatar → Import 3D** (ou **Fichier → Import 3D**), puis choisir `Dragon_Long_v15.glb`.
 2. Dans la fenêtre d'import :
    - unité **Stud** ;
    - parties **séparées** (ne pas fusionner) ;
@@ -71,7 +71,7 @@ Un `PointLight` jaune très discret dans `Eyes` (Brightness 0,5, Range 6, `Shado
 
 ## D. Vérifications finales
 - Lance le jeu et lis la console : **aucune erreur rouge**.
-- Simulateur d'appareil **téléphone** : la scène reste fluide avec le dragon visible. Avec environ 20 700 triangles, un dragon à l'écran ne pose pas de problème ; s'il en faut beaucoup, dis-le-moi, il faudra une version allégée.
+- Simulateur d'appareil **téléphone** : la scène reste fluide avec le dragon visible. Avec environ 21 200 triangles, un dragon à l'écran ne pose pas de problème ; s'il en faut beaucoup, dis-le-moi, il faudra une version allégée.
 - Récapitule-moi ce que tu as fait, où est rangé le modèle, et ce qui reste à faire.
 
 ## Pour plus tard (ne pas faire maintenant)

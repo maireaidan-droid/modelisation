@@ -1,8 +1,8 @@
 --[[
-Dragon Long v14 : réglages automatiques après l'import dans Roblox Studio.
+Dragon Long v15 : réglages automatiques après l'import dans Roblox Studio.
 
 Utilisation :
-  1. Importer Dragon_Long_v14.glb (Avatar > Import 3D, unité Stud, parties séparées, Anchored).
+  1. Importer Dragon_Long_v15.glb (Avatar > Import 3D, unité Stud, parties séparées, Anchored).
   2. Sélectionner le modèle importé dans l'Explorer (sinon le script cherche un modèle « Dragon_Long_v… » dans le Workspace).
   3. Affichage > Barre de commande (View > Command Bar), coller TOUT ce script, Entrée.
 
@@ -26,7 +26,7 @@ local PARTS = {
 	Whiskers = { color = "#F0C24B", material = Enum.Material.SmoothPlastic, shadow = true, doubleSided = true },
 	Eyes     = { color = "#FFD23F", material = Enum.Material.Neon,          shadow = false },
 	Pupils   = { color = "#17120E", material = Enum.Material.SmoothPlastic, shadow = false },
-	Mouth    = { color = "#3A1013", material = Enum.Material.SmoothPlastic, shadow = false },
+	Mouth    = { color = "#8E2529", material = Enum.Material.SmoothPlastic, shadow = false },
 	Tongue   = { color = "#B9434C", material = Enum.Material.SmoothPlastic, shadow = false },
 }
 local EXPECTED_LENGTH = 58 -- studs, environ
@@ -34,7 +34,7 @@ local EXPECTED_LENGTH = 58 -- studs, environ
 -- 1. Trouver le modèle
 local model = Selection:Get()[1]
 if not (model and model:IsA("Model")) then
-	model = workspace:FindFirstChild("Dragon_Long_v14", true)
+	model = workspace:FindFirstChild("Dragon_Long_v15", true)
 end
 if not (model and model:IsA("Model")) then
 	for _, m in ipairs(workspace:GetDescendants()) do
