@@ -1,6 +1,8 @@
 # Dragon Long (dragon chinois) stylisé, low-poly.
 # v1 : premier croquis. v2 : écailles en relief sur le dos, plaques sur le ventre, crête plus fournie, yeux retravaillés.
 # v3 : tête plus grande et sculptée (nez de félin, sourcils dorés en volutes, barbichette, joues, rides du museau).
+# v17 : cornes à anneaux et 2 branches, pattes musclées (épaule, coude en flammes, pied à 3 doigts griffus),
+#       crinière et joues en mèches de flammes épaisses.
 # v16 : gueule entièrement rouge à l'intérieur (la peau elle-même est colorée, plus rien ne dépasse), corps épaissi.
 # v15 : intérieur de la gueule tapissé d'un rouge uniforme (gorge, palais, plancher, gencives le long des dents).
 # v14 : peau du visage en écailles couchées (plaques presque à plat, bord arrière à peine soulevé) au lieu de pointes.
@@ -166,21 +168,58 @@ def build_spines(a, pts, T, N, B, radii):
         a.add("Fins", *fin(base_a, base_b, tip, b_end, 0.12))
 
 
+def flame_lock(a, base, back, out, L, r, part="Fins", curl=1.0, samples=10):
+    """Mèche de flamme : s'écarte de la peau en montant, ondule, puis file vers l'arrière et finit en pointe
+    qui se relève comme une flamme. Ruban aplati (fin dans la direction « out »), plus large près de la base."""
+    rel = ((0, 0), (0.22, 0.22), (0.55, 0.52), (0.98, 0.74), (1.42, 0.8), (1.8, 0.7 + 0.08 * curl),
+           (2.05, 0.82 + 0.25 * curl))
+    side_w = normalize(np.cross(back, out))
+    pts = [base + (back * bx + out * by) * L + side_w * 0.08 * L * np.sin(k * 1.3) * curl
+           for k, (bx, by) in enumerate(rel)]
+    line = catmull_rom(pts, samples)
+    radii = []
+    for k in range(samples):
+        q = k / (samples - 1)
+        radii.append(r * (min(1.0, 0.45 + q / 0.25 * 0.55) if q < 0.25 else (1 - q) / 0.75) ** 0.85)
+    radii[-1] = 0.0
+    a.add(part, *tube(line, radii, 5, up=out, flat=0.42))
+
+
 def build_leg(a, hip, fwd, down, side):
-    knee = hip + side * 1.9 - down * 0.4 + fwd * 0.6
-    ankle = knee + down * 2.0 + fwd * 1.0 + side * 0.2
-    foot = ankle + down * 0.5 + fwd * 0.5
-    a.add("Body", *tube([hip, knee, ankle, foot], [0.86, 0.63, 0.48, 0.45], 6, tip=False))
-    # Petite nageoire au coude.
-    a.add("Fins", *fin(knee - fwd * 0.2 + down * 0.3, knee + fwd * 0.5, knee - fwd * 1.6 - down * 0.6 + side * 0.4,
-                       np.cross(fwd, side), 0.1))
-    # 3 griffes vers l'avant + 1 ergot à l'arrière.
-    for ang in (-0.6, 0.0, 0.6):
+    """Patte musclée : épaule, bras galbé, coude marqué (avec mèches de flammes), avant-bras, gros pied
+    à 3 doigts articulés et griffes recourbées, plus un ergot."""
+    up = -down
+    elbow = hip + side * 1.55 + down * 0.95 - fwd * 0.35
+    wrist = elbow + down * 1.5 + fwd * 0.85 + side * 0.12
+    foot = wrist + down * 0.42 + fwd * 0.3
+    # Épaule : masse musclée qui se fond dans le corps.
+    a.add("Body", *blob(hip + side * 0.45 + down * 0.1, fwd, up, side, 1.0, 0.95, 0.85, 8, 5))
+    # Bras (biceps galbé) puis avant-bras.
+    arm = catmull_rom([hip + side * 0.3, (hip + elbow) / 2 + side * 0.08 - fwd * 0.1, elbow], 6)
+    a.add("Body", *tube(arm, [0.95, 0.92, 0.84, 0.76, 0.68, 0.62], 7, tip=False))
+    fore = catmull_rom([elbow, (elbow + wrist) / 2 + fwd * 0.12, wrist], 6)
+    a.add("Body", *tube(fore, [0.62, 0.64, 0.62, 0.56, 0.5, 0.46], 7, tip=False))
+    a.add("Body", *blob(elbow - fwd * 0.12, fwd, up, side, 0.42, 0.42, 0.42, 6, 4))        # coude
+    a.add("Body", *tube([wrist, foot], [0.46, 0.5], 7, tip=False))
+    # Pied : coussinet large.
+    a.add("Body", *blob(foot + down * 0.08 + fwd * 0.12, fwd, up, side, 0.62, 0.3, 0.58, 7, 4))
+    # 3 doigts articulés, griffes recourbées vers le sol.
+    for ang in (-0.5, 0.0, 0.5):
         d = normalize(fwd * np.cos(ang) + side * np.sin(ang))
-        pts = [foot, foot + d * 0.7, foot + d * 1.25 + down * 0.35, foot + d * 1.45 + down * 0.85]
-        a.add("Horns", *tube(pts, [0.24, 0.2, 0.12, 0.0], 5))
-    pts = [foot, foot - fwd * 0.6, foot - fwd * 0.85 + down * 0.5]
-    a.add("Horns", *tube(pts, [0.18, 0.12, 0.0], 5))
+        b0 = foot + d * 0.35 + down * 0.05
+        k1 = b0 + d * 0.42 + up * 0.08
+        k2 = k1 + d * 0.38 - up * 0.04
+        a.add("Body", *tube([b0, k1, k2], [0.22, 0.2, 0.16], 6, tip=False))
+        a.add("Horns", *tube([k2, k2 + d * 0.32 + up * 0.05, k2 + d * 0.55 + down * 0.25, k2 + d * 0.6 + down * 0.55],
+                             [0.15, 0.12, 0.07, 0.0], 5))
+    # Ergot vers l'arrière.
+    e0 = foot - fwd * 0.3 + up * 0.15
+    a.add("Horns", *tube([e0, e0 - fwd * 0.4 + down * 0.05, e0 - fwd * 0.55 + down * 0.4], [0.13, 0.08, 0.0], 5))
+    # Mèches de flammes au coude.
+    for L, lift in ((1.25, 0.0), (1.0, 0.35), (0.8, -0.3)):
+        out = normalize(side * 0.8 + up * 0.3 + fwd * 0.0)
+        back = normalize(-fwd + up * (0.35 + lift))
+        flame_lock(a, elbow + side * 0.35 - fwd * 0.2, back, out, L, 0.24, samples=8)
 
 
 def build_legs(a, pts, T, N, B, radii):
@@ -793,22 +832,30 @@ def build_head(a, neck, neck_r):
         cheek = [on_skin(x, y, side, lift) for x, y, lift in
                  ((2.4, 0.0, 0.0), (1.7, -0.08, 0.08), (0.9, -0.12, 0.1), (0.1, 0.0, 0.08), (-0.5, 0.25, 0.0))]
         a.add("Body", *tube(catmull_rom(cheek, 9), [0.04, 0.12, 0.17, 0.19, 0.19, 0.17, 0.14, 0.09, 0.03], 6))
-        for y0, L in ((0.15, 2.2), (-0.25, 2.6), (-0.65, 2.0)):
-            b0 = on_skin(0.4, y0, side, 0.0)
-            b1 = on_skin(-0.4, y0 + 0.1, side, 0.0)
-            tip = P(-0.4 - L, y0 + 0.2 + L * 0.25, (skull_side(-0.4, y0) + L * 0.55) * side)
-            a.add("Fins", *fin(b0, b1, tip, np.cross(tip - b0, b1 - b0), 0.12))
+        for y0, L in ((0.15, 1.15), (-0.25, 1.35), (-0.65, 1.05)):
+            b0 = on_skin(0.2, y0, side, -0.02)
+            out = normalize(s * side * 0.85 + u * 0.3)
+            flame_lock(a, b0, normalize(-f + u * 0.15 + s * side * 0.2), out, L * S, 0.24 * S, samples=8)
 
-    # Cornes en bois de cerf, vers l'arrière, avec une branche.
+    # Cornes en bois de cerf : épaisses à la base, anneaux en relief, 2 branches, pointe qui se recourbe.
+    def ridged(path, r0, n, ring=2.4, sides=7):
+        line = catmull_rom(path, n)
+        radii = []
+        for k in range(n):
+            q = k / (n - 1)
+            bump = 1 + 0.16 * max(0.0, np.cos(2 * np.pi * k / ring)) * (1 - q)
+            radii.append(r0 * (1 - q) ** 0.75 * bump)
+        radii[-1] = 0.0
+        a.add("Horns", *tube(line, radii, sides))
+        return line
+
     for side in (1, -1):
-        h0 = P(-0.1, 1.5, 0.7 * side)
-        h1 = P(-1.1, 2.6, 1.0 * side)
-        h2 = P(-2.6, 3.3, 1.35 * side)
-        h3 = P(-4.0, 3.3, 1.5 * side)
-        h4 = P(-4.7, 3.8, 1.55 * side)
-        a.add("Horns", *tube([h0, h1, h2, h3, h4], [0.33, 0.28, 0.22, 0.12, 0.0], 6))
-        a.add("Horns", *tube([h1 * 0.5 + h2 * 0.5, P(-1.6, 4.0, 1.2 * side), P(-1.4, 4.6, 1.15 * side)],
-                             [0.15, 0.09, 0.0], 5))
+        main = ridged([P(-0.1, 1.45, 0.7 * side), P(-0.9, 2.45, 0.95 * side), P(-2.0, 3.25, 1.25 * side),
+                       P(-3.2, 3.6, 1.45 * side), P(-4.2, 3.72, 1.55 * side), P(-4.9, 4.05, 1.5 * side)], 0.44, 16)
+        for idx, (up_l, back_l, r) in ((5, (1.05, 0.35, 0.19)), (10, (0.8, 0.3, 0.15))):
+            b0 = main[idx]
+            ridged([b0, b0 + (u * up_l * 0.5 - f * back_l * 0.2 + s * side * 0.05) * S,
+                    b0 + (u * up_l - f * back_l + s * side * 0.08) * S], r, 7, ring=2.0, sides=6)
         # Oreilles en nageoire.
         a.add("Fins", *fin(P(-0.4, 0.9, 1.45 * side), P(-1.2, 0.6, 1.2 * side), P(-2.3, 1.5, 2.4 * side),
                            normalize(u - s * side * 0.5), 0.12))
@@ -819,15 +866,17 @@ def build_head(a, neck, neck_r):
                P(1.0, -0.45, 4.3 * side), P(-0.9, -1.05, 4.9 * side), P(-2.8, -0.65, 5.3 * side)]
         a.add("Whiskers", *tube(catmull_rom(pts, 14), np.linspace(0.16, 0.0, 14), 4))
 
-    # Crinière en flammes autour de la nuque.
-    for ang in np.linspace(np.radians(-150), np.radians(150), 11):
-        rad = np.array([0, np.cos(ang), np.sin(ang)])  # 0° = vers le haut
-        base_a = P(0.2, 0.3 + rad[1] * 1.3, rad[2] * 1.4)
-        base_b = P(-1.1, 0.2 + rad[1] * 1.1, rad[2] * 1.15)
-        length = 2.6 if abs(ang) < 1.6 else 1.9
-        tip = P(-1.1 - length, 0.3 + rad[1] * (1.1 + length * 0.75), rad[2] * (1.15 + length * 0.75))
-        normal = np.cross(tip - base_a, base_b - base_a)
-        a.add("Fins", *fin(base_a, base_b, tip, normal, 0.14))
+    # Crinière : mèches de flammes épaisses en 2 couches autour de la nuque, qui partent vers l'arrière.
+    for layer, (x0, ring_r, n, L_top, L_side, r) in enumerate(((-0.55, 1.3, 11, 2.7, 2.0, 0.34),
+                                                               (-0.15, 1.15, 10, 1.8, 1.35, 0.27))):
+        for i, ang in enumerate(np.linspace(np.radians(-155), np.radians(155), n)):
+            ang += (np.radians(14) if layer else 0.0)
+            rad_y, rad_z = np.cos(ang), np.sin(ang)          # 0° = vers le haut
+            base = P(x0, 0.25 + rad_y * ring_r, rad_z * (ring_r + 0.1))
+            out = normalize(u * rad_y + s * rad_z)
+            back = normalize(-f + out * 0.15)
+            L = (L_top if abs(ang) < np.radians(100) else L_side) * (0.9 + 0.2 * ((i * 0.37) % 1))
+            flame_lock(a, base, back, out, L * S, r * S * 0.9, curl=1.0 if i % 2 else -0.6)
 
     # Barbichette : 3 grosses mèches rouges sous le menton, qui descendent puis s'enroulent vers l'arrière.
     for z, L, r in ((0.0, 1.0, 0.34), (0.32, 0.8, 0.26), (-0.32, 0.8, 0.26)):
@@ -843,7 +892,7 @@ def build_head(a, neck, neck_r):
 
 
 def build():
-    a = Asset("Dragon_Long_v16")
+    a = Asset("Dragon_Long_v17")
     for name, (color, mat) in COULEURS.items():
         a.part(name, color, mat)
     pts = catmull_rom(SPINE, RINGS)
