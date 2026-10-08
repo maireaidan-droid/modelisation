@@ -162,3 +162,64 @@ pebbled reptile skin on the lids and cheeks, symmetrical, highly detailed sculpt
 | Sourcils plus lourds | `heavier brow ridges overhanging the eyes, deeper V frown` |
 | Yeux plus enfoncés | `push the eyes deeper into the sockets, narrower lids, stronger shadow` |
 | Poches sous les yeux | `more pronounced puffy under-eye folds, layered wrinkles` |
+
+---
+
+## 8. Prompts de modification du dragon existant (nez et yeux)
+
+À donner à l'IA qui travaille déjà sur le dragon (générateur `generateur/dragon_long.py`, version actuelle v4).
+Chaque prompt ne touche qu'une zone, pour ne pas casser le reste.
+
+### Nez
+```
+Sur le dragon existant (v4), modifie uniquement le nez. Ne touche ni aux yeux,
+ni aux cornes, ni à la crinière, ni à la mâchoire, ni au corps.
+
+Forme visée (référence : buste sculpté de dragon oriental) :
+- truffe large et bombée, type félin/bouledogue, plus large que haute,
+  qui reste fondue dans le crâne (pas de pièce collée) ;
+- un sillon vertical profond au milieu qui sépare la truffe en deux lobes arrondis ;
+- deux grosses narines rondes tournées vers l'avant, avec un bourrelet épais
+  tout autour du bord, et un creux profond et sombre à l'intérieur ;
+- sous la truffe, deux coussinets de lèvre supérieure gonflés, d'où partent les moustaches ;
+- chanfrein court entre les yeux et la truffe, avec 2 ou 3 plis horizontaux
+  et de petites écailles qui disparaissent en approchant de la truffe.
+
+Contraintes : symétrie gauche/droite, style low-poly à facettes conservé,
+garder les couleurs et matériaux du manifest (narines en Pupils),
+rester sous ~13 000 triangles au total. Génère une v5 avec son aperçu,
+compare-la à la v4 et ajuste si la truffe paraît collée ou trop pointue.
+```
+
+### Zone des yeux
+```
+Sur le dragon existant (v4), modifie uniquement la zone des yeux : arcades,
+paupières, orbites, dessous des yeux et pommettes. Ne touche pas au nez,
+aux cornes, à la crinière ni au corps.
+
+Forme visée (référence : buste sculpté de dragon oriental) :
+- arcades sourcilières massives qui avancent au-dessus des yeux et forment
+  un V froncé et colérique, la pointe du V descendant vers le haut du nez ;
+- un pli profond entre les deux arcades, qui file jusqu'au chanfrein ;
+- yeux en amande étroits, enfoncés dans l'orbite, à moitié couverts par
+  une paupière supérieure lourde (regard mi-clos, menaçant) ;
+- sous chaque œil, une poche gonflée avec 2 plis superposés ;
+- pommettes saillantes sous les poches, qui partent vers l'arrière de la tête ;
+- au-dessus des arcades, le front couvert d'écailles en losange qui se chevauchent.
+
+Contraintes : symétrie, style low-poly à facettes conservé, les yeux restent
+en Neon et doivent rester visibles (ne pas les enterrer sous l'arcade),
+garder les sourcils dorés en volutes mais les poser sur la nouvelle arcade,
+rester sous ~13 000 triangles. Génère une v5 avec un aperçu de face
+et un de profil, et vérifie qu'on voit encore les yeux de face.
+```
+
+### Retouches après un premier essai
+| Problème | Prompt |
+|---|---|
+| Truffe qui paraît collée | `Fonds mieux la truffe dans le crâne : pas d'arête visible entre le chanfrein et la truffe.` |
+| Narines trop petites | `Agrandis les narines de 30 %, épaissis leur bourrelet et creuse-les davantage.` |
+| Nez trop pointu | `Aplatis et élargis la truffe, raccourcis le chanfrein.` |
+| Regard pas assez méchant | `Fais descendre l'arcade de 15 % sur l'œil et accentue le V entre les sourcils.` |
+| Yeux invisibles de face | `Recule légèrement l'arcade ou avance l'œil pour qu'il reste visible de face.` |
+| Zone trop lisse | `Ajoute les plis sous les yeux et sur le chanfrein, sans dépasser le budget de triangles.` |
