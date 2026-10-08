@@ -88,15 +88,15 @@
   },
   {
     "name": "Dragon_Long_v3",
-    "tris": 11986,
+    "tris": 11396,
     "size_studs": [
       14.5,
       19.2,
-      57.9
+      57.8
     ],
     "parts": {
       "Body": {
-        "tris": 5636,
+        "tris": 5046,
         "color": "#2F7D63",
         "material": "SmoothPlastic"
       },
