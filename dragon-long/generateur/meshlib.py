@@ -111,13 +111,25 @@ def ellipse_ring(center, ax_u, ax_v, ru, rv, sides, angle0=0.0):
     return (np.asarray(center) + np.outer(np.cos(a) * ru, ax_u) + np.outer(np.sin(a) * rv, ax_v))
 
 
-def tube(points, radii, sides=6, tip=True, up=(0, 1, 0)):
-    """Tube le long d'une ligne ; si le dernier rayon est 0 et tip=True, il finit en pointe."""
+def tube(points, radii, sides=6, tip=True, up=(0, 1, 0), flat=1.0):
+    """Tube le long d'une ligne ; si un rayon d'extrémité est 0 et tip=True, il finit en pointe.
+    flat < 1 aplatit le tube dans la direction « up » (ruban : mèches, sourcils)."""
     pts = np.asarray(points, float)
     T, N, B = frames(pts, up)
     rings = []
     for p, r, n, b in zip(pts, radii, N, B):
-        rings.append(p[None] if (tip and r <= 1e-6) else ellipse_ring(p, b, n, r, r, sides, np.pi / sides))
+        rings.append(p[None] if (tip and r <= 1e-6) else ellipse_ring(p, b, n, r, r * flat, sides, np.pi / sides))
+    return loft(rings)
+
+
+def blob(center, ax_f, ax_u, ax_s, rf, ru, rs, sides=8, rows=4):
+    """Ellipsoïde low-poly (joues, coussinets du museau)."""
+    c = np.asarray(center, float)
+    rings = [c - ax_f * rf]
+    for k in range(1, rows):
+        t = -np.pi / 2 + k * np.pi / rows
+        rings.append(ellipse_ring(c + ax_f * rf * np.sin(t), ax_s, ax_u, rs * np.cos(t), ru * np.cos(t), sides))
+    rings.append(c + ax_f * rf)
     return loft(rings)
 
 

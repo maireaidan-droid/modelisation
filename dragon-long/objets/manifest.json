@@ -85,5 +85,51 @@
         "material": "SmoothPlastic"
       }
     }
+  },
+  {
+    "name": "Dragon_Long_v3",
+    "tris": 11396,
+    "size_studs": [
+      14.5,
+      19.2,
+      57.8
+    ],
+    "parts": {
+      "Body": {
+        "tris": 5046,
+        "color": "#2F7D63",
+        "material": "SmoothPlastic"
+      },
+      "Belly": {
+        "tris": 3314,
+        "color": "#E2B65C",
+        "material": "SmoothPlastic"
+      },
+      "Fins": {
+        "tris": 1052,
+        "color": "#C8432F",
+        "material": "SmoothPlastic"
+      },
+      "Horns": {
+        "tris": 736,
+        "color": "#E6DCC3",
+        "material": "SmoothPlastic"
+      },
+      "Whiskers": {
+        "tris": 1120,
+        "color": "#F0C24B",
+        "material": "SmoothPlastic"
+      },
+      "Eyes": {
+        "tris": 96,
+        "color": "#FFD23F",
+        "material": "Neon"
+      },
+      "Pupils": {
+        "tris": 32,
+        "color": "#17120E",
+        "material": "SmoothPlastic"
+      }
+    }
   }
 ]

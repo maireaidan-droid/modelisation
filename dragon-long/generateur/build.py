@@ -60,6 +60,7 @@ def main():
         # Pivot : posé à Y = 0, centré sur X/Z.
         mn, mx = a.bounds()
         shift = np.array([(mn[0] + mx[0]) / 2, mn[1], (mn[2] + mx[2]) / 2])
+        tete = np.asarray(getattr(a, "head_center", mx)) - shift
         for p in a.parts.values():
             p["v"] = (np.array(p["v"]) - shift).tolist()
         export_glb(a, os.path.join(OUT, a.name + ".glb"))
@@ -73,12 +74,10 @@ def main():
         })
 
         fig = plt.figure(figsize=(16, 20), facecolor=FOND)
-        head = (np.array([0, mx[1] - 4, mx[2] - 5]), 5.5)
-        dos = (np.array([4, 7, mx[2] - 22]), 6.5)
-        centre = ((mn + mx) / 2, (mx - mn)[:2].max() / 2 + 1)
+        head = (tete, 5.2)
         views = [(321, 5, 0, "Profil gauche", None), (322, 25, -55, "Trois-quarts", None),
-                 (323, 8, -90, "Tête de face", head), (324, 12, -35, "Tête trois-quarts", head),
-                 (325, 45, 20, "Écailles et crête du dos", dos), (326, -55, 30, "Ventre (dessous)", centre)]
+                 (323, 6, -90, "Tête de face", head), (324, 12, -38, "Tête trois-quarts", head),
+                 (325, 4, 0, "Tête de profil", head), (326, 30, -130, "Tête vue de dessus, côté droit", head)]
         for pos, e, az, t, foc in views:
             ax = fig.add_subplot(pos, projection="3d")
             render(ax, a, e, az, t, zoom=1.35 if foc is not None else 1.75, focus=foc)
