@@ -1,6 +1,7 @@
 # Dragon Long (dragon chinois) stylisé, low-poly.
 # v1 : premier croquis. v2 : écailles en relief sur le dos, plaques sur le ventre, crête plus fournie, yeux retravaillés.
 # v3 : tête plus grande et sculptée (nez de félin, sourcils dorés en volutes, barbichette, joues, rides du museau).
+# v10 : museau affiné (−26 % en largeur, −20 % en hauteur par le dessus), à partir de l'arrière des yeux.
 # v9 : intérieur de la gueule (gorge, palais à bourrelets, langue fendue) et dentition acérée.
 # v8 : nez agressif : arête tranchante sur le museau, corne de nez, narines en fentes inclinées comme le V
 #      des arcades avec ailes évasées, rides en chevrons, bout du museau plus crochu.
@@ -323,9 +324,19 @@ def relief(x, y, side_w, top_w=0.0, z=None):
     return d
 
 
+MUZZLE_W = 0.74   # largeur du museau par rapport au profil de base
+MUZZLE_H = 0.8    # hauteur du dessus du museau par rapport au profil de base
+
+
+def muzzle_w(x):
+    """Facteur de largeur : 1 au niveau des yeux, MUZZLE_W sur le museau (transition douce)."""
+    return 1 - (1 - MUZZLE_W) * smoothstep(2.2, 3.1, x)
+
+
 def skull_section(x):
     xs = [r[0] for r in SKULL]
-    return [np.interp(x, xs, [r[k] for r in SKULL]) for k in (1, 2, 3, 4)]
+    yc, w, ht, hb = [np.interp(x, xs, [r[k] for r in SKULL]) for k in (1, 2, 3, 4)]
+    return [yc, w * muzzle_w(x), ht * (1 - (1 - MUZZLE_H) * smoothstep(2.3, 3.2, x)), hb]
 
 
 def skull_point(x, t):
@@ -383,6 +394,10 @@ def build_head(a, neck, neck_r):
 
     def P(x, y, z):
         return origin + (f * x + u * y + s * z) * S
+
+    def Pm(x, y, z):
+        """Comme P, mais la largeur suit l'affinement du museau."""
+        return P(x, y, z * muzzle_w(x))
 
     def on_skin(x, y, side, lift=0.04):
         return P(x, y, side * (skull_side(x, y) + lift))
@@ -464,6 +479,7 @@ def build_head(a, neck, neck_r):
     c, sn = np.cos(-0.35), np.sin(-0.35)
 
     def jaw_ring(x, y, w, h, n=8):
+        w = w * muzzle_w(x)
         ang = np.pi / n + np.arange(n) * 2 * np.pi / n
         out = []
         for t in ang:
@@ -481,10 +497,10 @@ def build_head(a, neck, neck_r):
     a.add("Belly", *loft([jaw_ring(0.4, -1.08, 1.02, 0.25), jaw_ring(3.7, -1.12, 0.62, 0.2)]))
     # Lèvre du haut en bourrelet, qui remonte au coin de la gueule.
     for side in (1, -1):
-        lip = [P(0.5, -0.25, 1.45 * side), P(1.2, -0.6, 1.35 * side), P(2.2, -0.75, 1.2 * side),
-               P(3.2, -0.78, 1.1 * side), P(3.9, -0.72, 0.95 * side)]
+        lip = [Pm(0.5, -0.25, 1.45 * side), Pm(1.2, -0.6, 1.35 * side), Pm(2.2, -0.75, 1.2 * side),
+               Pm(3.2, -0.78, 1.1 * side), Pm(3.9, -0.72, 0.95 * side)]
         a.add("Body", *tube(catmull_rom(lip, 9), [0.06, 0.12, 0.15, 0.16, 0.16, 0.15, 0.14, 0.12, 0.05], 5))
-        low = [jaw_point(x, -0.62, w * side) for x, w in ((0.9, 1.15), (2.0, 1.02), (3.0, 0.92), (3.9, 0.72))]
+        low = [jaw_point(x, -0.62, w * muzzle_w(x) * side) for x, w in ((0.9, 1.15), (2.0, 1.02), (3.0, 0.92), (3.9, 0.72))]
         a.add("Body", *tube(low, [0.05, 0.1, 0.1, 0.04], 5))
 
     def jaw_up(x):
@@ -525,15 +541,15 @@ def build_head(a, neck, neck_r):
     for x in (1.6, 2.2, 2.8, 3.35):
         yc, w, ht, hb = skull_section(x)
         y0 = yc - hb + 0.1
-        ridge = [P(x + 0.12, y0, -0.62), P(x - 0.08, y0 - 0.06, -0.3), P(x - 0.12, y0 - 0.08, 0.0),
-                 P(x - 0.08, y0 - 0.06, 0.3), P(x + 0.12, y0, 0.62)]
+        ridge = [Pm(x + 0.12, y0, -0.62), Pm(x - 0.08, y0 - 0.06, -0.3), Pm(x - 0.12, y0 - 0.08, 0.0),
+                 Pm(x - 0.08, y0 - 0.06, 0.3), Pm(x + 0.12, y0, 0.62)]
         a.add("Mouth", *tube(ridge, [0.0, 0.08, 0.09, 0.08, 0.0], 5))
 
     # Langue : large et plate sur le plancher, le bout qui se relève et se fend en deux.
     tongue = [jaw_point(x, jaw_top(x) + lift, 0.0) for x, lift in
               ((0.6, 0.2), (1.5, 0.21), (2.4, 0.22), (3.1, 0.25), (3.55, 0.38))]
     tl = catmull_rom(tongue, 9)
-    a.add("Tongue", *tube(tl, [0.4, 0.46, 0.48, 0.47, 0.44, 0.4, 0.35, 0.3, 0.24], 8, tip=False,
+    a.add("Tongue", *tube(tl, [0.36, 0.41, 0.42, 0.4, 0.37, 0.33, 0.29, 0.25, 0.2], 8, tip=False,
                           up=jaw_up(2.0), flat=0.38))
     for side in (1, -1):
         b0 = tl[-1]
@@ -554,18 +570,18 @@ def build_head(a, neck, neck_r):
             yc, w, ht, hb = skull_section(x)
             L = (0.42 if k % 2 else 0.26) + 0.08 * x / 3.6
             fang(P(x, -0.66, side * min(w, 1.2) * 0.9), -u, L, 0.075)
-        fang(P(3.85, -0.66, 0.85 * side), -u, 1.05, 0.15)                       # grand croc
-        fang(P(3.45, -0.66, 0.95 * side), -u, 0.62, 0.1)                        # croc secondaire
+        fang(Pm(3.85, -0.66, 0.85 * side), -u, 1.05, 0.15)                       # grand croc
+        fang(Pm(3.45, -0.66, 0.95 * side), -u, 0.62, 0.1)                        # croc secondaire
         for z in (0.2, 0.47):
-            fang(P(4.3 - z * 0.35, -0.66, z * side), -u, 0.3, 0.065)           # incisives
+            fang(Pm(4.3 - z * 0.35, -0.66, z * side), -u, 0.3, 0.065)           # incisives
         # Rangée du bas, sur la mâchoire, pointes vers le haut.
         for k, x in enumerate(np.arange(1.3, 3.4, 0.3)):
-            w = np.interp(x, [0.2, 1.6, 3.0, 3.8], [1.25, 1.08, 0.95, 0.82]) * 0.82
+            w = np.interp(x, [0.2, 1.6, 3.0, 3.8], [1.25, 1.08, 0.95, 0.82]) * 0.82 * muzzle_w(x)
             L = (0.36 if k % 2 else 0.22) + 0.06 * x / 3.4
             fang(jaw_point(x, jaw_top(x) - 0.02, w * side), jaw_up(x), L, 0.07)
-        fang(jaw_point(3.55, -0.65, 0.66 * side), jaw_up(3.55), 0.85, 0.14)      # croc du bas
+        fang(jaw_point(3.55, -0.65, 0.66 * muzzle_w(3.55) * side), jaw_up(3.55), 0.85, 0.14)      # croc du bas
         for z in (0.18, 0.4):
-            fang(jaw_point(4.0 - z * 0.3, -0.72, z * side), jaw_up(4.0), 0.26, 0.06)
+            fang(jaw_point(4.0 - z * 0.3, -0.72, z * muzzle_w(4.0) * side), jaw_up(4.0), 0.26, 0.06)
 
     # Yeux : amande dorée qui brille, pupille fendue, paupières.
     for side in (1, -1):
@@ -629,7 +645,7 @@ def build_head(a, neck, neck_r):
 
     # Moustaches longues et ondulées, qui partent des coussinets du museau.
     for side in (1, -1):
-        pts = [P(4.1, -0.25, 1.05 * side), P(3.9, -0.35, 2.2 * side), P(2.8, -0.8, 3.4 * side),
+        pts = [Pm(4.1, -0.25, 1.05 * side), P(3.9, -0.35, 2.2 * side), P(2.8, -0.8, 3.4 * side),
                P(1.0, -0.45, 4.3 * side), P(-0.9, -1.05, 4.9 * side), P(-2.8, -0.65, 5.3 * side)]
         a.add("Whiskers", *tube(catmull_rom(pts, 14), np.linspace(0.16, 0.0, 14), 4))
 
@@ -656,7 +672,7 @@ def build_head(a, neck, neck_r):
 
 
 def build():
-    a = Asset("Dragon_Long_v9")
+    a = Asset("Dragon_Long_v10")
     for name, (color, mat) in COULEURS.items():
         a.part(name, color, mat)
     pts = catmull_rom(SPINE, RINGS)
