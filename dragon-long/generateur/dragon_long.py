@@ -1,6 +1,7 @@
 # Dragon Long (dragon chinois) stylisé, low-poly.
 # v1 : premier croquis. v2 : écailles en relief sur le dos, plaques sur le ventre, crête plus fournie, yeux retravaillés.
 # v3 : tête plus grande et sculptée (nez de félin, sourcils dorés en volutes, barbichette, joues, rides du museau).
+# v7 : nez de la v4 (museau, coussinets, narines en virgule, rides du museau) + zone des yeux de la v6.
 # v6 : zone des yeux (arcades en V froncé, pli entre les arcades, yeux mi-clos, poches à 2 plis, pommettes,
 #      écailles du front) ; narines creusées vers l'intérieur.
 # v5 : nouveau nez (seul changement) : truffe large en 2 lobes, sillon, grosses narines à bourrelet, coussinets
@@ -229,16 +230,15 @@ SKULL = [
     (2.6, 0.08, 1.22, 0.95, 0.95),
     (3.3, 0.02, 1.15, 0.88, 0.85),
     (3.9, -0.02, 1.1, 0.84, 0.8),
-    (4.25, -0.04, 1.03, 0.79, 0.76),
-    (4.45, -0.05, 0.99, 0.77, 0.74),   # bord de la face avant du museau (la truffe est sculptée dedans)
+    (4.3, -0.05, 0.98, 0.76, 0.72),
+    (4.55, -0.07, 0.78, 0.64, 0.58),
+    (4.72, -0.08, 0.5, 0.44, 0.38),
 ]
-NOSE_X = 4.45     # x du bord de la face avant
 SIDES_HEAD = 32   # côtés du crâne (multiple de 4 : sommets pile sur le dessus, le dessous et les côtés)
 SUPER = 2.6   # > 2 : section plus carrée, joues pleines
 EYE = (1.5, 0.5)  # centre de l'œil (x, y) dans le repère de la tête
 
 
-FOLDS = (2.93, 3.32, 3.7)   # crêtes des plis du chanfrein
 # Arcade sourcilière gauche, de l'arrière de l'œil jusqu'au haut du nez : (x, angle sur le crâne, épaisseur).
 # Vue de face elle descend vers le milieu : les 2 arcades forment un V froncé dont la pointe touche le nez.
 BROW_CTRL = [(0.85, 0.8, 0.55), (1.2, 0.62, 0.85), (1.55, 0.47, 1.0), (1.9, 0.78, 1.0),
@@ -307,11 +307,11 @@ def relief(x, y, side_w, top_w=0.0, z=None):
         d += brow_bump(x, y, z)
         # Pli profond entre les 2 arcades, qui descend jusqu'au chanfrein.
         d -= 0.32 * gauss(z / 0.13) * smoothstep(1.55, 1.85, x) * (1 - smoothstep(2.55, 2.85, x)) * top_w
-    # Coussinets de lèvre : leur bord extérieur déborde un peu sur les côtés du museau.
-    d += 0.16 * gauss(np.hypot((x - 4.1) / 0.4, (y + 0.4) / 0.3)) * side_w
-    # Chanfrein : 3 plis en travers (bourrelet suivi d'un creux), qui s'estompent sur les côtés.
-    for xc in FOLDS:
-        d += (0.075 * gauss((x - xc) / 0.06) - 0.055 * gauss((x - xc + 0.1) / 0.06)) * top_w
+    # Coussinets des moustaches, gonflés de chaque côté du museau (comme un tigre).
+    d += 0.3 * gauss(np.hypot((x - 4.05) / 0.5, (y + 0.3) / 0.36)) * side_w
+    # Arête du nez : léger creux, puis la truffe qui se relève au bout.
+    d -= 0.07 * gauss((x - 4.0) / 0.22) * top_w
+    d += 0.12 * gauss((x - 4.5) / 0.22) * top_w
     return d
 
 
@@ -334,7 +334,12 @@ def skull_point(x, t):
     nn = np.hypot(nz, ny) or 1.0
     nz, ny = nz / nn, ny / nn
     d = relief(x, yc + y, abs(nz) ** 1.5, max(0.0, ny) ** 2, z)
-    return np.array([x, yc + y + ny * d, z + nz * d])
+    # Avant du museau : la truffe déborde en haut, les coussinets avancent, le sillon recule au milieu.
+    front = smoothstep(4.0, 4.72, x)
+    dx = 0.3 * front * max(0.0, st) ** 1.3
+    dx += 0.14 * front * np.clip(-st * abs(ct) * 2.2, 0, 1)
+    dx -= 0.18 * front * gauss(ct / 0.22) * max(0.0, -st)
+    return np.array([x + dx, yc + y + ny * d, z + nz * d])
 
 
 def skin_normal(x, t):
@@ -343,51 +348,6 @@ def skin_normal(x, t):
     n = normalize(n)
     c = np.array([x, skull_section(x)[0], 0.0])
     return n if n @ (p - c) > 0 else -n
-
-
-# ---------- face avant du museau : truffe, narines, coussinets ----------
-# Coordonnées normalisées de la face avant : u de -1 (côté droit) à 1 (côté gauche), v de -1 (bas) à 1 (haut).
-NOSTRIL = (0.37, 0.33, 0.23)   # centre u, v et rayon des narines
-
-
-def nose_shape(u, v, r):
-    """Avancée (en studs) de la face avant au point (u, v) ; r = 0 au centre, 1 sur le bord.
-    Renvoie aussi la distance normalisée au centre de la narine la plus proche (< 1 : dans la narine)."""
-    nu, nv, nr = NOSTRIL
-    dome = 0.26 * np.sqrt(max(0.0, 1 - r * r))                       # museau arrondi, pas pointu
-    # Truffe : une seule masse ovale, large et bombée (plus large que haute), en haut de la face.
-    feat = 0.3 * gauss(np.hypot(u / 0.66, (v - 0.32) / 0.42))
-    # Coussinets de lèvre : une masse plus basse, gonflée, sous la truffe.
-    feat += 0.24 * gauss(np.hypot(u / 0.72, (v + 0.52) / 0.32))
-    # Sillon vertical au milieu : coupe la truffe en 2 lobes et descend entre les 2 coussinets.
-    feat -= 0.24 * gauss(u / 0.1) * smoothstep(-1.05, -0.85, v) * (1 - smoothstep(0.75, 0.98, v))
-    # Narines rondes : bourrelet épais autour, creux profond dedans.
-    dn = min(np.hypot(u - nu, v - nv), np.hypot(u + nu, v - nv)) / nr
-    # Naseaux creusés vers l'intérieur : à peine un rebord, et un trou profond à parois raides.
-    feat += 0.03 * gauss((dn - 1.15) / 0.4)
-    feat -= 0.55 * max(0.0, 1 - dn * dn) ** 0.45
-    return dome + feat * (1 - smoothstep(0.7, 1.0, r)), dn
-
-
-def unit_dir(t):
-    ct, st = np.cos(t), np.sin(t)
-    return np.sign(ct) * abs(ct) ** (2 / SUPER), np.sign(st) * abs(st) ** (2 / SUPER)
-
-
-def front_point(t, r):
-    """Point de la face avant : anneau de rayon r (1 = bord, 0 = centre) à l'angle t. Renvoie (point, dn)."""
-    yc = skull_section(NOSE_X)[0]
-    rim = skull_point(NOSE_X, t)
-    un, vn = unit_dir(t)
-    dx, dn = nose_shape(r * un, r * vn, r)
-    return np.array([NOSE_X + dx, yc + (rim[1] - yc) * r, rim[2] * r]), dn
-
-
-def front_point_uv(u, v):
-    """Même chose à partir de (u, v) : sert à poser les moustaches sur les coussinets."""
-    r = (abs(u) ** SUPER + abs(v) ** SUPER) ** (1 / SUPER)
-    t = np.arctan2(np.sign(v) * abs(v / r) ** (SUPER / 2), np.sign(u) * abs(u / r) ** (SUPER / 2))
-    return front_point(t, r)[0]
 
 
 def skull_side(x, y):
@@ -419,26 +379,24 @@ def build_head(a, neck, neck_r):
     def on_skin(x, y, side, lift=0.04):
         return P(x, y, side * (skull_side(x, y) + lift))
 
-    # Crâne + museau d'un seul tenant : les côtés, puis la face avant en anneaux concentriques jusqu'au bout
-    # du nez. Truffe, sillon, narines et coussinets sont sculptés dans cette même peau (rien de collé).
-    xs = np.concatenate([np.linspace(-1.4, 0.6, 3), np.linspace(0.85, 2.3, 10),
-                         [2.65, 2.83, 2.93, 3.08, 3.22, 3.32, 3.47, 3.6, 3.7, 4.0, 4.25, NOSE_X]])
+    # Crâne + museau d'un seul tenant (truffe, coussinets, sillon et orbites sculptés dans la même peau).
+    xs = np.concatenate([np.linspace(-1.4, 0.6, 3), np.linspace(0.85, 2.3, 10), np.linspace(2.6, 3.8, 4),
+                         np.linspace(3.95, 4.72, 7)])
     angs = np.arange(SIDES_HEAD) * 2 * np.pi / SIDES_HEAD
-    rings = [np.array([P(*skull_point(x, t)) for t in angs]) for x in xs]
-    dns = [np.full(SIDES_HEAD, 9.0) for _ in xs]
-    # Anneaux plus serrés à la hauteur des narines, pour qu'elles restent bien rondes.
-    for rr in (0.96, 0.88, 0.79, 0.71, 0.64, 0.57, 0.5, 0.43, 0.36, 0.28, 0.18, 0.08):
-        pts = [front_point(t, rr) for t in angs]
-        rings.append(np.array([P(*p) for p, _ in pts]))
-        dns.append(np.array([d for _, d in pts]))
-    tip, _ = front_point(0.0, 0.0)
-    rings.append(P(*tip)[None])
-    dns.append(np.array([0.0 if abs(NOSTRIL[0]) < NOSTRIL[2] else 9.0]))
-    verts, faces = loft(rings)
-    dn = np.concatenate(dns + [[9.0]])                       # + centre du bouchon arrière
-    # L'intérieur des narines (le creux) prend la couleur sombre des pupilles.
-    inside = dn[faces].max(axis=1) < 0.95
-    a.add_split(verts, faces, np.where(inside, "Pupils", "Body"))
+    a.add("Body", *loft([np.array([P(*skull_point(x, t)) for t in angs]) for x in xs]))
+
+    # Narines en virgule, creusées dans le haut de la truffe.
+    for side in (1, -1):
+        rim = skull_point(4.72, np.pi / 2 - side * 0.9)
+        n0 = P(*(rim * 0.72 + np.array([4.86, 0.05, 0.0]) * 0.28))
+        a.add("Pupils", *gem(n0, normalize(f * 0.9 + s * side * 0.3), u, normalize(s * side - f * 0.3),
+                             0.09 * S, 0.12 * S, 0.2 * S))
+
+    # Rides du chanfrein (le « grognement » des félins) : 3 bourrelets en arc sur le museau.
+    for x in (2.55, 2.95, 3.35):
+        arc = [P(x + 0.06 * abs(np.cos(t)), skull_top(x) * np.sin(t) * 0.97 + 0.02 * (1 - np.sin(t)),
+                 skull_side(x, 0.3) * np.cos(t) * 0.92) for t in np.linspace(np.radians(35), np.radians(145), 7)]
+        a.add("Body", *tube(arc, [0.0, 0.07, 0.1, 0.11, 0.1, 0.07, 0.0], 5))
 
     def head_scale(x, t, size):
         """Petite écaille en losange posée sur la peau, la pointe vers l'arrière de la tête."""
@@ -454,11 +412,6 @@ def build_head(a, neck, neck_r):
         loc = [p0 - back * L * 0.45 + sink, p0 + side_v * W / 2 + sink, p0 + back * L * 0.55 + sink,
                p0 - side_v * W / 2 + sink, p0 + back * L * 0.25 + nrm * H]
         a.add("Body", [P(*q) for q in loc], [(0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4), (0, 3, 2), (0, 2, 1)])
-
-    # Petites écailles sur le chanfrein, de plus en plus petites, qui disparaissent avant la truffe.
-    for x, n, size in ((1.95, 4, 0.2), (2.25, 3, 0.17), (2.55, 4, 0.13), (2.78, 3, 0.1), (3.15, 2, 0.07), (3.52, 2, 0.045)):
-        for k in range(n):
-            head_scale(x, np.pi / 2 + (k - (n - 1) / 2) * 0.32, size)
 
     # Front au-dessus des arcades : écailles en losange qui se chevauchent, en quinconce.
     for row, x in enumerate(np.arange(-0.35, 1.75, 0.21)):
@@ -574,7 +527,7 @@ def build_head(a, neck, neck_r):
 
     # Moustaches longues et ondulées, qui partent des coussinets du museau.
     for side in (1, -1):
-        pts = [P(*front_point_uv(0.66 * side, -0.48)), P(3.9, -0.35, 2.2 * side), P(2.8, -0.8, 3.4 * side),
+        pts = [P(4.1, -0.25, 1.05 * side), P(3.9, -0.35, 2.2 * side), P(2.8, -0.8, 3.4 * side),
                P(1.0, -0.45, 4.3 * side), P(-0.9, -1.05, 4.9 * side), P(-2.8, -0.65, 5.3 * side)]
         a.add("Whiskers", *tube(catmull_rom(pts, 14), np.linspace(0.16, 0.0, 14), 4))
 
@@ -601,7 +554,7 @@ def build_head(a, neck, neck_r):
 
 
 def build():
-    a = Asset("Dragon_Long_v6")
+    a = Asset("Dragon_Long_v7")
     for name, (color, mat) in COULEURS.items():
         a.part(name, color, mat)
     pts = catmull_rom(SPINE, RINGS)
