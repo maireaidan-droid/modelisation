@@ -3,13 +3,14 @@
 Modèle low-poly à facettes pour Roblox, inspiré du dragon chinois (Long) : corps de serpent en S,
 ventre doré, crinière et épines rouges, cornes en bois de cerf, moustaches, 4 pattes à 3 griffes, yeux qui brillent.
 
-![aperçu v5](apercu-Dragon_Long_v5.png)
+![aperçu v6](apercu-Dragon_Long_v6.png)
 
-Comparaison du nez v4 / v5 : [comparaison-nez-Dragon_Long_v4-Dragon_Long_v5.png](comparaison-nez-Dragon_Long_v4-Dragon_Long_v5.png)
+Comparaisons : [nez v4 / v5](comparaison-nez-Dragon_Long_v4-Dragon_Long_v5.png) · [yeux v5 / v6](comparaison-yeux-Dragon_Long_v5-Dragon_Long_v6.png) · [nez v5 / v6](comparaison-nez-Dragon_Long_v5-Dragon_Long_v6.png)
 
 | Version | Fichier | Triangles | Nouveautés |
 |---|---|---|---|
-| **v5** (actuelle) | `objets/Dragon_Long_v5.glb` | 12 952 | à partir de la v4, **seul le nez change** : truffe large et bombée fondue dans le crâne, sillon vertical qui la sépare en 2 lobes, 2 grosses narines rondes avec bourrelet et creux sombre, coussinets de lèvre d'où partent les moustaches, chanfrein court avec 3 plis et des écailles qui rapetissent jusqu'à disparaître |
+| **v6** (actuelle) | `objets/Dragon_Long_v6.glb` | 13 730 | zone des yeux : arcades massives en V froncé dont la pointe descend sur le nez, pli profond entre elles, yeux en amande étroits enfoncés et mi-clos sous une paupière lourde (toujours visibles de face), poche à 2 plis sous chaque œil, pommettes saillantes vers l'arrière, front couvert d'écailles en losange ; sourcils dorés en volutes reposés sur l'arcade ; narines creusées vers l'intérieur |
+| v5 | `objets/Dragon_Long_v5.glb` | 12 952 | à partir de la v4, **seul le nez change** : truffe large et bombée fondue dans le crâne, sillon vertical qui la sépare en 2 lobes, 2 grosses narines rondes avec bourrelet et creux sombre, coussinets de lèvre d'où partent les moustaches, chanfrein court avec 3 plis et des écailles qui rapetissent jusqu'à disparaître ([aperçu](apercu-Dragon_Long_v5.png)) |
 | v5_gueule (essai mis de côté) | `objets/Dragon_Long_v5_gueule.glb` | 12 928 | gueule habitée : gorge sombre, palais à bourrelets, langue fendue, rangées de dents en haut et en bas avec incisives ; yeux plus grands et tournés vers l'avant pour être vus de face ([aperçu](apercu-Dragon_Long_v5_gueule.png)) — pas reprise dans la v5 |
 | v4 | `objets/Dragon_Long_v4.glb` | 11 986 | nez fondu dans le crâne : truffe, coussinets et sillon sculptés dans la même peau ; yeux enfoncés dans des orbites sous une arcade, avec pommettes ([aperçu](apercu-Dragon_Long_v4.png)) |
 | v3 | `objets/Dragon_Long_v3.glb` | 11 396 | tête plus grande (×1,3) et sculptée : nez de félin (truffe, narines, coussinets des moustaches, rides du chanfrein), sourcils dorés en volutes, barbichette, pommettes et joues en flammes, lèvres, marque dorée sur le front ([aperçu](apercu-Dragon_Long_v3.png)) |
@@ -37,7 +38,7 @@ Pour les nageoires, mettre `DoubleSided = true` si elles disparaissent sous cert
 
 ## Comparer deux versions
 ```
-cd dragon-long/generateur && python compare.py Dragon_Long_v4 Dragon_Long_v5
+cd dragon-long/generateur && python compare.py Dragon_Long_v5 Dragon_Long_v6 yeux   # ou nez
 ```
 
 ## Régénérer

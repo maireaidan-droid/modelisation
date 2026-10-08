@@ -1,6 +1,8 @@
 # Dragon Long (dragon chinois) stylisé, low-poly.
 # v1 : premier croquis. v2 : écailles en relief sur le dos, plaques sur le ventre, crête plus fournie, yeux retravaillés.
 # v3 : tête plus grande et sculptée (nez de félin, sourcils dorés en volutes, barbichette, joues, rides du museau).
+# v6 : zone des yeux (arcades en V froncé, pli entre les arcades, yeux mi-clos, poches à 2 plis, pommettes,
+#      écailles du front) ; narines creusées vers l'intérieur.
 # v5 : nouveau nez (seul changement) : truffe large en 2 lobes, sillon, grosses narines à bourrelet, coussinets
 #      de lèvre, chanfrein court à plis et petites écailles.
 # v4 : nez fondu dans le crâne (truffe, coussinets et sillon sculptés dans la même peau), yeux enfoncés dans des orbites.
@@ -179,17 +181,18 @@ def build_legs(a, pts, T, N, B, radii):
 
 
 def build_eye(a, P, f, u, side_v, S):
+    """Œil en amande étroit, enfoncé, mi-clos sous une paupière lourde ; poche à 2 plis dessous."""
     sd = 1 if side_v @ np.cross(u, f) > 0 else -1
     ex, ey = EYE
-    c = P(ex, ey, (skull_side(ex, ey) + 0.02) * sd)              # posé au fond de l'orbite
-    out = normalize(side_v + f * 0.45 + u * 0.1)              # l'œil regarde un peu vers l'avant
-    e1 = normalize(f - out * (f @ out) - u * 0.22)            # grand axe, coin arrière relevé
+    c = P(ex, ey, (skull_side(ex, ey) + 0.03) * sd)              # au fond de l'orbite
+    out = normalize(side_v + f * 0.8 + u * 0.1)               # tourné vers l'avant : visible de face
+    e1 = normalize(f - out * (f @ out) - u * 0.2)             # grand axe, coin arrière relevé
     e2 = normalize(np.cross(out, e1))
     if e2 @ u < 0:
         e2 = -e2
-    L, Hh, D = 0.55 * S, 0.33 * S, 0.2 * S
+    L, Hh, D = 0.6 * S, 0.24 * S, 0.19 * S
 
-    # Amande : anneaux le long du grand axe.
+    # Amande étroite.
     rings = [c - e1 * L]
     for x, k in ((-0.55, 0.75), (0.0, 1.0), (0.55, 0.75)):
         ang = np.arange(8) * np.pi / 4
@@ -197,18 +200,22 @@ def build_eye(a, P, f, u, side_v, S):
     rings.append(c + e1 * L)
     a.add("Eyes", *loft(rings))
 
-    # Pupille fendue, verticale, posée sur l'œil.
-    a.add("Pupils", *gem(c + out * D * 0.95 + e1 * L * 0.1, e1, e2, out, 0.075 * S, Hh * 0.85, 0.06 * S))
+    # Pupille fendue, verticale.
+    a.add("Pupils", *gem(c + out * D * 0.95 + e1 * L * 0.05, e1, e2, out, 0.07 * S, Hh * 0.9, 0.06 * S))
 
-    # Paupière du haut : bourrelet qui couvre le tiers supérieur, plus lourd vers l'arrière.
-    lid = [c + e1 * L * x + e2 * Hh * (0.55 + 0.25 * (1 - abs(x))) + out * D * (0.35 + 0.4 * (1 - abs(x)))
-           - e2 * Hh * 0.25 * max(0.0, -x)
-           for x in np.linspace(-1.15, 1.1, 7)]
-    a.add("Body", *tube(lid, [0.06, 0.15, 0.2, 0.2, 0.17, 0.12, 0.05], 6, up=out))
-    # Petite paupière du bas.
-    low = [c + e1 * L * x - e2 * Hh * (0.8 + 0.1 * abs(x)) + out * D * 0.4 for x in np.linspace(-0.9, 0.8, 5)]
-    a.add("Body", *tube(low, [0.03, 0.08, 0.09, 0.07, 0.02], 5, up=out))
+    # Paupière du haut lourde : couvre la moitié de l'œil (regard mi-clos), plus basse côté nez (air colérique).
+    lid = [c + e1 * L * x + e2 * Hh * (0.75 - 0.35 * max(0.0, x)) + out * D * (0.45 + 0.45 * (1 - abs(x)))
+           for x in np.linspace(-1.2, 1.15, 8)]
+    a.add("Body", *tube(lid, [0.07, 0.19, 0.25, 0.28, 0.28, 0.24, 0.16, 0.06], 6, up=out))
 
+    # Poche sous l'œil : 2 plis superposés en croissant, posés sur la peau.
+    for k, (dy, r) in enumerate(((0.36, 0.085), (0.56, 0.07))):
+        fold = []
+        for q in np.linspace(-1, 1, 7):
+            xx = ex + 0.05 + q * (0.55 - 0.08 * k)
+            yy = ey - dy - 0.08 * (1 - q * q)
+            fold.append(P(xx, yy, (skull_side(xx, yy) + 0.01) * sd))
+        a.add("Body", *tube(fold, [0.0, r * 0.6, r, r, r, r * 0.6, 0.0], 5))
 
 
 # Profil du crâne : x (vers l'avant), centre vertical, demi-largeur, demi-hauteur dessus, demi-hauteur dessous.
@@ -232,6 +239,12 @@ EYE = (1.5, 0.5)  # centre de l'œil (x, y) dans le repère de la tête
 
 
 FOLDS = (2.93, 3.32, 3.7)   # crêtes des plis du chanfrein
+# Arcade sourcilière gauche, de l'arrière de l'œil jusqu'au haut du nez : (x, angle sur le crâne, épaisseur).
+# Vue de face elle descend vers le milieu : les 2 arcades forment un V froncé dont la pointe touche le nez.
+BROW_CTRL = [(0.85, 0.8, 0.55), (1.2, 0.62, 0.85), (1.55, 0.47, 1.0), (1.9, 0.78, 1.0),
+             (2.2, 1.1, 0.9), (2.5, 1.35, 0.75), (2.75, 1.5, 0.55)]
+BROW_H = 0.5      # hauteur de l'arcade (studs)
+BROW_W = 0.23       # demi-largeur de l'arcade
 
 
 def gauss(v):
@@ -243,17 +256,57 @@ def smoothstep(a, b, x):
     return t * t * (3 - 2 * t)
 
 
-def relief(x, y, side_w, top_w=0.0):
+def base_point(x, t):
+    """Point de la super-ellipse du crâne, sans relief : (x, y, z)."""
+    yc, w, ht, hb = skull_section(x)
+    ct, st = np.cos(t), np.sin(t)
+    h = ht if st >= 0 else hb
+    return np.array([x, yc + h * np.sign(st) * abs(st) ** (2 / SUPER), w * np.sign(ct) * abs(ct) ** (2 / SUPER)])
+
+
+_BROW = None
+
+
+def brow_line():
+    """Tracé dense de l'arcade : liste de (x, angle), points 3D (côté gauche, sans relief) et épaisseurs."""
+    global _BROW
+    if _BROW is None:
+        xt = catmull_rom([(x, t, k) for x, t, k in BROW_CTRL], 40)
+        pts = np.array([base_point(x, t) for x, t, _ in xt])
+        _BROW = (xt[:, :2], pts, xt[:, 2])
+    return _BROW
+
+
+def brow_bump(x, y, z):
+    _, pts, k = brow_line()
+    d = np.linalg.norm(pts - np.array([x, y, abs(z)]), axis=1)
+    i = np.argmin(d)
+    return BROW_H * k[i] * gauss(d[i] / BROW_W)
+
+
+def seg_dist(px, py, a, b):
+    a, b, p = np.asarray(a, float), np.asarray(b, float), np.array([px, py])
+    t = np.clip((p - a) @ (b - a) / ((b - a) @ (b - a)), 0, 1)
+    return np.linalg.norm(p - a - t * (b - a))
+
+
+def relief(x, y, side_w, top_w=0.0, z=None):
     """Bosses et creux sculptés dans la peau du crâne (en studs, vers l'extérieur).
     side_w : 1 sur le côté de la tête, 0 dessus/dessous (les orbites ne creusent que les côtés).
-    top_w : 1 sur le dessus (arête du nez)."""
+    top_w : 1 sur le dessus (arête du nez). z : demi-largeur au point (pour l'arcade et le pli du front)."""
     ex, ey = EYE
     d = 0.0
-    # Orbite : creux en amande autour de l'œil, et arcade sourcilière en bourrelet au-dessus.
-    d -= 0.38 * gauss(np.hypot((x - ex) / 0.62, (y - ey) / 0.42)) * side_w
-    d += 0.22 * gauss(np.hypot((x - ex - 0.1) / 0.8, (y - ey - 0.58) / 0.2)) * side_w
-    # Pommette sous l'orbite, qui file vers l'arrière.
-    d += 0.1 * gauss(np.hypot((x - ex + 0.4) / 0.9, (y - ey + 0.62) / 0.22)) * side_w
+    # Orbite : creux en amande, étroit, où l'œil s'enfonce.
+    d -= 0.4 * gauss(np.hypot((x - ex) / 0.6, (y - ey) / 0.32)) * side_w
+    # Poche gonflée sous l'œil.
+    d += 0.17 * gauss(np.hypot((x - ex - 0.05) / 0.5, (y - ey + 0.45) / 0.18)) * side_w
+    # Pommette saillante, en arête qui file vers l'arrière de la tête.
+    d += 0.17 * gauss(seg_dist(x, y, (1.85, -0.12), (-0.7, 0.24)) / 0.2) * side_w
+    if z is not None:
+        # Arcades massives en V au-dessus des yeux.
+        d += brow_bump(x, y, z)
+        # Pli profond entre les 2 arcades, qui descend jusqu'au chanfrein.
+        d -= 0.32 * gauss(z / 0.13) * smoothstep(1.55, 1.85, x) * (1 - smoothstep(2.55, 2.85, x)) * top_w
     # Coussinets de lèvre : leur bord extérieur déborde un peu sur les côtés du museau.
     d += 0.16 * gauss(np.hypot((x - 4.1) / 0.4, (y + 0.4) / 0.3)) * side_w
     # Chanfrein : 3 plis en travers (bourrelet suivi d'un creux), qui s'estompent sur les côtés.
@@ -280,8 +333,16 @@ def skull_point(x, t):
     ny = np.sign(y) * abs(y / h) ** (SUPER - 1) / h
     nn = np.hypot(nz, ny) or 1.0
     nz, ny = nz / nn, ny / nn
-    d = relief(x, yc + y, abs(nz) ** 1.5, max(0.0, ny) ** 2)
+    d = relief(x, yc + y, abs(nz) ** 1.5, max(0.0, ny) ** 2, z)
     return np.array([x, yc + y + ny * d, z + nz * d])
+
+
+def skin_normal(x, t):
+    p = skull_point(x, t)
+    n = np.cross(skull_point(x + 0.04, t) - skull_point(x - 0.04, t), skull_point(x, t + 0.04) - skull_point(x, t - 0.04))
+    n = normalize(n)
+    c = np.array([x, skull_section(x)[0], 0.0])
+    return n if n @ (p - c) > 0 else -n
 
 
 # ---------- face avant du museau : truffe, narines, coussinets ----------
@@ -302,8 +363,9 @@ def nose_shape(u, v, r):
     feat -= 0.24 * gauss(u / 0.1) * smoothstep(-1.05, -0.85, v) * (1 - smoothstep(0.75, 0.98, v))
     # Narines rondes : bourrelet épais autour, creux profond dedans.
     dn = min(np.hypot(u - nu, v - nv), np.hypot(u + nu, v - nv)) / nr
-    feat += 0.12 * gauss((dn - 1.15) / 0.45)
-    feat -= 0.38 * max(0.0, 1 - dn * dn) ** 0.7
+    # Naseaux creusés vers l'intérieur : à peine un rebord, et un trou profond à parois raides.
+    feat += 0.03 * gauss((dn - 1.15) / 0.4)
+    feat -= 0.55 * max(0.0, 1 - dn * dn) ** 0.45
     return dome + feat * (1 - smoothstep(0.7, 1.0, r)), dn
 
 
@@ -334,7 +396,7 @@ def skull_side(x, y):
     h = ht if y >= yc else hb
     v = min(abs(y - yc) / h, 0.999)
     z = w * (1 - v ** SUPER) ** (1 / SUPER)
-    return z + relief(x, y, (1 - v) ** 0.5)
+    return z + relief(x, y, (1 - v) ** 0.5, 0.0, z)
 
 
 def skull_top(x):
@@ -359,7 +421,7 @@ def build_head(a, neck, neck_r):
 
     # Crâne + museau d'un seul tenant : les côtés, puis la face avant en anneaux concentriques jusqu'au bout
     # du nez. Truffe, sillon, narines et coussinets sont sculptés dans cette même peau (rien de collé).
-    xs = np.concatenate([np.linspace(-1.4, 0.6, 3), np.linspace(0.85, 2.3, 7),
+    xs = np.concatenate([np.linspace(-1.4, 0.6, 3), np.linspace(0.85, 2.3, 10),
                          [2.65, 2.83, 2.93, 3.08, 3.22, 3.32, 3.47, 3.6, 3.7, 4.0, 4.25, NOSE_X]])
     angs = np.arange(SIDES_HEAD) * 2 * np.pi / SIDES_HEAD
     rings = [np.array([P(*skull_point(x, t)) for t in angs]) for x in xs]
@@ -378,22 +440,39 @@ def build_head(a, neck, neck_r):
     inside = dn[faces].max(axis=1) < 0.95
     a.add_split(verts, faces, np.where(inside, "Pupils", "Body"))
 
+    def head_scale(x, t, size):
+        """Petite écaille en losange posée sur la peau, la pointe vers l'arrière de la tête."""
+        p0 = skull_point(x, t)
+        dxp = skull_point(x + 0.05, t) - skull_point(x - 0.05, t)
+        dtp = skull_point(x, t + 0.05) - skull_point(x, t - 0.05)
+        nrm = normalize(np.cross(dxp, dtp))
+        if nrm[1] < 0:
+            nrm = -nrm
+        back, side_v = np.array([-1.0, 0, 0]), normalize(dtp)
+        L, W, H = size * 1.5, size * 1.1, size * 0.45
+        sink = -nrm * size * 0.25
+        loc = [p0 - back * L * 0.45 + sink, p0 + side_v * W / 2 + sink, p0 + back * L * 0.55 + sink,
+               p0 - side_v * W / 2 + sink, p0 + back * L * 0.25 + nrm * H]
+        a.add("Body", [P(*q) for q in loc], [(0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4), (0, 3, 2), (0, 2, 1)])
+
     # Petites écailles sur le chanfrein, de plus en plus petites, qui disparaissent avant la truffe.
     for x, n, size in ((1.95, 4, 0.2), (2.25, 3, 0.17), (2.55, 4, 0.13), (2.78, 3, 0.1), (3.15, 2, 0.07), (3.52, 2, 0.045)):
         for k in range(n):
-            t = np.pi / 2 + (k - (n - 1) / 2) * 0.32
-            p0 = skull_point(x, t)
-            dxp = skull_point(x + 0.05, t) - skull_point(x - 0.05, t)
-            dtp = skull_point(x, t + 0.05) - skull_point(x, t - 0.05)
-            nrm = normalize(np.cross(dxp, dtp))
-            if nrm[1] < 0:
-                nrm = -nrm
-            back, side_v = np.array([-1.0, 0, 0]), normalize(dtp)
-            L, W, H = size * 1.5, size * 1.1, size * 0.45
-            sink = -nrm * size * 0.25
-            loc = [p0 - back * L * 0.45 + sink, p0 + side_v * W / 2 + sink, p0 + back * L * 0.55 + sink,
-                   p0 - side_v * W / 2 + sink, p0 + back * L * 0.25 + nrm * H]
-            a.add("Body", [P(*q) for q in loc], [(0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4), (0, 3, 2), (0, 2, 1)])
+            head_scale(x, np.pi / 2 + (k - (n - 1) / 2) * 0.32, size)
+
+    # Front au-dessus des arcades : écailles en losange qui se chevauchent, en quinconce.
+    for row, x in enumerate(np.arange(-0.35, 1.75, 0.21)):
+        offs = np.arange(-4, 5) * 0.17 + (0.085 if row % 2 else 0.0)
+        for dt in offs:
+            t = np.pi / 2 + dt
+            if abs(dt) > 0.72:
+                continue
+            bp = base_point(x, t)
+            if brow_bump(*bp) > 0.06 or (0.75 < x < 1.75 and abs(dt) < 0.2):   # pas sur l'arcade ni la marque dorée
+                continue
+            if min(np.linalg.norm(bp - np.array([-0.1, 1.5, 0.7])), np.linalg.norm(bp - np.array([-0.1, 1.5, -0.7]))) < 0.45:
+                continue                                                         # pas sur la base des cornes
+            head_scale(x, t, 0.19)
 
     # Mâchoire du bas, entrouverte de 20°.
     hinge = np.array([0.4, -0.55])
@@ -437,37 +516,36 @@ def build_head(a, neck, neck_r):
     for side in (1, -1):
         build_eye(a, P, f, u, s * side, S)
 
-    # Sourcils dorés gracieux : une volute devant l'œil, puis une longue mèche qui passe au-dessus
-    # et file vers l'arrière, avec 2 petites flammes qui s'en échappent.
+    # Sourcils dorés en volutes, posés sur la crête de l'arcade : une volute à la pointe du V (près du nez),
+    # puis la mèche suit l'arcade vers l'arrière et file derrière la tête, avec 2 petites flammes.
+    xt, _, _ = brow_line()
     for side in (1, -1):
-        cx, cy = 2.45, 1.05
+        def crest(x, t, lift=0.07):
+            tt = t if side > 0 else np.pi - t
+            return P(*(skull_point(x, tt) + skin_normal(x, tt) * lift))
+        cx, ct0 = xt[-1][0] + 0.05, xt[-1][1] - 0.25
         spiral = []
-        for k, th in enumerate(np.linspace(-np.pi / 2 + 2.3 * np.pi, -np.pi / 2, 12)):
-            rho = 0.08 + 0.34 * k / 11
-            x, y = cx + rho * np.cos(th), cy + rho * np.sin(th)
-            spiral.append(on_skin(x, y, side, 0.06 + 0.05 * k / 11))
-        sweep = [on_skin(x, y, side, lift) for x, y, lift in
-                 ((2.1, 0.8, 0.1), (1.7, 1.05, 0.12), (1.1, 1.35, 0.12), (0.4, 1.55, 0.12), (-0.4, 1.7, 0.15))]
-        sweep += [P(-1.3, 1.8, (skull_side(-1.3, 1.0) + 0.35) * side), P(-2.2, 2.0, 1.95 * side),
-                  P(-3.0, 2.35, 2.25 * side), P(-3.4, 2.7, 2.3 * side), P(-3.2, 2.95, 2.2 * side)]
-        line = np.vstack([spiral, catmull_rom(sweep, 16)[1:]])
+        for k, th in enumerate(np.linspace(2.2 * np.pi, 0.0, 12)):
+            rho = 0.06 + 0.26 * k / 11
+            spiral.append(crest(cx + rho * np.cos(th), ct0 + rho * np.sin(th) * 1.3, 0.06 + 0.03 * k / 11))
+        along = [crest(x, t) for x, t in xt[::-1][4::4]]
+        sweep = along + [P(-0.4, 1.85, (skull_side(-0.4, 1.4) + 0.2) * side),
+                         P(-1.3, 1.95, (skull_side(-1.3, 1.0) + 0.35) * side), P(-2.2, 2.1, 1.95 * side),
+                         P(-3.0, 2.4, 2.25 * side), P(-3.4, 2.75, 2.3 * side), P(-3.2, 3.0, 2.2 * side)]
+        line = np.vstack([spiral, catmull_rom(sweep, 22)])
         n = len(line)
-        radii = [0.07 + 0.17 * min(1.0, k / 10) * (1 - max(0, k - 12) / (n - 12)) ** 0.8 for k in range(n)]
+        radii = [0.07 + 0.17 * min(1.0, k / 10) * (1 - max(0, k - 16) / (n - 16)) ** 0.8 for k in range(n)]
         radii[-1] = 0.0
         a.add("Whiskers", *tube(line, radii, 6, up=s * side, flat=0.45))
-        for x0, y0, L in ((1.2, 1.3, 0.9), (0.2, 1.45, 1.15)):
-            b0 = on_skin(x0, y0, side, 0.12)
-            tuft = [b0, b0 + (-f * 0.35 + u * 0.45 + s * side * 0.1) * S * L, b0 + (-f * 0.95 + u * 0.75 + s * side * 0.2) * S * L,
-                    b0 + (-f * 1.5 + u * 0.7 + s * side * 0.25) * S * L, b0 + (-f * 1.75 + u * 0.45 + s * side * 0.25) * S * L]
+        for j, L in ((12, 0.9), (20, 1.0)):
+            b0 = crest(*xt[j], 0.12)
+            tuft = [b0, b0 + (-f * 0.45 + u * 0.25 + s * side * 0.15) * S * L, b0 + (-f * 1.0 + u * 0.4 + s * side * 0.3) * S * L,
+                    b0 + (-f * 1.5 + u * 0.38 + s * side * 0.38) * S * L, b0 + (-f * 1.75 + u * 0.2 + s * side * 0.4) * S * L]
             a.add("Whiskers", *tube(catmull_rom(tuft, 8), [0.15, 0.15, 0.13, 0.11, 0.08, 0.06, 0.03, 0.0], 5,
                                     up=s * side, flat=0.5))
 
-    # Front : marque dorée en losange entre les yeux, et deux arêtes qui montent vers les cornes.
+    # Front : marque dorée en losange entre les arcades.
     a.add("Whiskers", *gem(P(1.25, skull_top(1.25) + 0.02, 0), f, u, s, 0.45 * S, 0.1 * S, 0.24 * S))
-    for side in (1, -1):
-        ridge = [P(2.0, skull_top(2.0) - 0.02, 0.35 * side), P(1.1, skull_top(1.1) + 0.02, 0.55 * side),
-                 P(0.1, skull_top(0.1) - 0.02, 0.7 * side)]
-        a.add("Body", *tube(ridge, [0.05, 0.13, 0.12], 5, tip=False))
 
     # Pommettes en relief et joues en flammes vers l'arrière.
     for side in (1, -1):
@@ -523,7 +601,7 @@ def build_head(a, neck, neck_r):
 
 
 def build():
-    a = Asset("Dragon_Long_v5")
+    a = Asset("Dragon_Long_v6")
     for name, (color, mat) in COULEURS.items():
         a.part(name, color, mat)
     pts = catmull_rom(SPINE, RINGS)

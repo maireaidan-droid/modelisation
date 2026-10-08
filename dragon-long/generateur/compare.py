@@ -1,5 +1,5 @@
 # Planche de comparaison en gros plan sur la tête entre deux versions exportées (.glb).
-# Usage : python compare.py Dragon_Long_v4 Dragon_Long_v5
+# Usage : python compare.py Dragon_Long_v4 Dragon_Long_v5 [nez|yeux]
 import os
 import sys
 import numpy as np
@@ -44,14 +44,21 @@ def draw(ax, parts, elev, azim, centre, half, title):
     ax.set_title(title, color="white", fontsize=13)
 
 
-def main(old, new):
+def main(old, new, mode="nez"):
     a = build()
     mn, mx = a.bounds()
     shift = np.array([(mn[0] + mx[0]) / 2, mn[1], (mn[2] + mx[2]) / 2])
     tete = np.asarray(a.head_center) - shift
     nez = tete + np.array([0, -0.35, 3.6])
-    views = [(6, -90, "de face", nez, 2.6), (14, -40, "trois-quarts", nez, 2.8), (3, 0, "profil", nez, 2.8),
-             (8, -90, "tête entière de face", tete, 5.2)]
+    yeux = tete + np.array([0, 0.5, 1.0])
+    if mode == "yeux":
+        views = [(8, -90, "yeux de face", yeux, 2.9), (12, -45, "yeux trois-quarts", yeux, 2.9),
+                 (4, 0, "yeux profil", yeux, 3.0), (35, -150, "front, vue de dessus", yeux, 3.4)]
+        mode_name = "yeux"
+    else:
+        views = [(6, -90, "de face", nez, 2.6), (14, -40, "trois-quarts", nez, 2.8), (3, 0, "profil", nez, 2.8),
+                 (8, -90, "tête entière de face", tete, 5.2)]
+        mode_name = "nez"
     fig = plt.figure(figsize=(18, 9.5), facecolor=FOND)
     for row, name in enumerate((old, new)):
         parts = load(name)
@@ -59,10 +66,10 @@ def main(old, new):
             ax = fig.add_subplot(2, 4, row * 4 + col + 1, projection="3d")
             draw(ax, parts, e, az, c, h, f"{name} · {t}")
     plt.subplots_adjust(left=0, right=1, bottom=0, top=0.95, wspace=0, hspace=0.08)
-    path = os.path.join(ROOT, f"comparaison-nez-{old}-{new}.png")
+    path = os.path.join(ROOT, f"comparaison-{mode_name}-{old}-{new}.png")
     fig.savefig(path, dpi=100, facecolor=FOND)
     print(path)
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    main(*sys.argv[1:4])
