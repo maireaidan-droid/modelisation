@@ -1,6 +1,7 @@
 # Dragon Long (dragon chinois) stylisé, low-poly.
 # v1 : premier croquis. v2 : écailles en relief sur le dos, plaques sur le ventre, crête plus fournie, yeux retravaillés.
 # v3 : tête plus grande et sculptée (nez de félin, sourcils dorés en volutes, barbichette, joues, rides du museau).
+# v18 : crête du dos et queue en mèches de flammes (même style que la crinière), écailles du corps couchées en tuiles.
 # v17 : cornes à anneaux et 2 branches, pattes musclées (épaule, coude en flammes, pied à 3 doigts griffus),
 #       crinière et joues en mèches de flammes épaisses.
 # v16 : gueule entièrement rouge à l'intérieur (la peau elle-même est colorée, plus rien ne dépasse), corps épaissi.
@@ -105,7 +106,8 @@ def surface(pts, T, N, B, radii, x, ang, k=1.0):
 
 
 def build_scales(a, pts, T, N, B, radii):
-    # Écailles en losange, en quinconce, la pointe relevée vers la queue (comme des tuiles qui se chevauchent).
+    # Écailles couchées comme des tuiles (même style que la tête), en quinconce : bouclier plat à 5 côtés,
+    # bord avant enfoncé sous l'écaille précédente, bord arrière (vers la queue) à peine soulevé.
     step = 2 * np.pi / 10
     spacing = np.linalg.norm(pts[1] - pts[0])
     for row in range(3, RINGS - 4):
@@ -113,14 +115,15 @@ def build_scales(a, pts, T, N, B, radii):
         for d in offs:
             c, o, t, r = surface(pts, T, N, B, radii, row + 0.5, np.pi / 2 + d, 0.97)
             x = normalize(np.cross(o, t))
-            L, W, H = spacing * 1.7, r * step * 1.2, 0.1 + 0.07 * r
-            sink = -o * 0.1 * r
-            front, back = c - t * L * 0.45 + sink, c + t * L * 0.55 + sink
-            left, right = c - x * W / 2 + sink, c + x * W / 2 + sink
-            apex = c + t * L * 0.3 + o * H
-            verts = [front, right, back, left, apex]
-            faces = [(0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4), (0, 3, 2), (0, 2, 1)]
-            a.add("Body", verts, faces)
+            L, W = spacing * 1.75, r * step * 1.15
+            base = []
+            for k in range(5):
+                ang = 2 * np.pi * k / 5              # k = 0 : bord arrière, vers la queue
+                ca, sa = np.cos(ang), np.sin(ang)
+                lift = (0.03 + 0.025 * r) * max(0.0, ca) - (0.08 + 0.05 * r) * max(0.0, -ca)
+                base.append(c + t * ca * L * (0.55 if ca > 0 else 0.45) + x * sa * W / 2 + o * lift)
+            apex = c + t * L * 0.15 + o * (0.05 + 0.035 * r)
+            a.add("Body", base + [apex], [(k, (k + 1) % 5, 5) for k in range(5)] + [(0, 2, 1), (0, 3, 2), (0, 4, 3)])
 
 
 def build_belly_plates(a, pts, T, N, B, radii):
@@ -139,36 +142,33 @@ def build_belly_plates(a, pts, T, N, B, radii):
 
 
 def build_spines(a, pts, T, N, B, radii):
-    # Crête du dos en triangles, couchés vers l'arrière : grand / petit / moyen, penchés un peu à gauche puis à droite.
-    sizes = (1.3, 0.75, 1.0, 0.8)
-    for j, i in enumerate(range(4, RINGS - 4, 2)):
+    # Crête du dos : mèches de flammes qui se suivent, couchées vers la queue, grandes / petites en alternance,
+    # penchées un peu à gauche puis à droite (même style que la crinière).
+    sizes = (1.0, 0.7, 0.85, 0.65)
+    for j, i in enumerate(range(5, RINGS - 6, 3)):
         r = radii[i]
-        base_a = pts[i] + N[i] * r * 0.85
-        base_b = pts[i + 3] + N[i + 3] * radii[i + 3] * 0.85
-        h = (0.6 + 0.55 * r) * sizes[j % 4]
-        lean = B[i + 1] * (0.12 if j % 2 else -0.12) * h
-        tip = (base_a + base_b) / 2 + N[i + 1] * h + T[i + 1] * h * 0.95 + lean
-        a.add("Fins", *fin(base_a, base_b, tip, B[i + 1], 0.14))
-    # Franges sur les côtés de la queue.
-    for i in range(int(RINGS * 0.55), RINGS - 3, 5):
-        for s in (1, -1):
+        base = pts[i] + N[i] * r * 0.85
+        out = normalize(N[i] + B[i] * (0.12 if j % 2 else -0.12))
+        L = (0.95 + 0.55 * r) * sizes[j % 4]
+        flame_lock(a, base, T[i], out, L, 0.22 + 0.14 * r, curl=1.0 if j % 2 else -0.7, samples=7, thin=B[i])
+    # Petites flammes sur les côtés de la queue.
+    for i in range(int(RINGS * 0.58), RINGS - 5, 6):
+        for sd in (1, -1):
             r = radii[i]
-            base_a = pts[i] + B[i] * s * r * 0.8
-            base_b = pts[i + 2] + B[i + 2] * s * radii[i + 2] * 0.8
-            tip = (base_a + base_b) / 2 + B[i + 1] * s * (0.9 + r * 0.6) + T[i + 1] * 1.2 - N[i + 1] * 0.2
-            a.add("Fins", *fin(base_a, base_b, tip, N[i + 1], 0.12))
-    # Nageoire de queue en forme de flamme.
+            base = pts[i] + B[i] * sd * r * 0.8
+            flame_lock(a, base, T[i], normalize(B[i] * sd + N[i] * 0.25), 0.45 + 0.4 * r, 0.12 + 0.06 * r,
+                       curl=0.8, samples=6, thin=N[i])
+    # Bout de la queue : une grande flamme en éventail de 5 mèches.
     end, t_end, n_end, b_end = pts[-1], T[-1], N[-1], B[-1]
-    for k, ang in enumerate(np.linspace(-1.2, 1.2, 6)):
-        d = normalize(t_end * np.cos(ang) + n_end * np.sin(ang))
-        length = 3.4 - abs(ang) * 0.9
-        base_a = end - t_end * 0.9 + n_end * 0.15 * np.sin(ang)
-        base_b = end + d * 0.3
-        tip = end + d * length + t_end * 0.4
-        a.add("Fins", *fin(base_a, base_b, tip, b_end, 0.12))
+    for k, ang in enumerate(np.linspace(-0.85, 0.85, 5)):
+        back = normalize(t_end * np.cos(ang) + n_end * np.sin(ang))
+        out = normalize(-t_end * np.sin(ang) + n_end * np.cos(ang))
+        L = 2.5 - abs(ang) * 0.8
+        flame_lock(a, end - t_end * 0.6, back, out, L, 0.58 - abs(ang) * 0.14, curl=1.0 if k % 2 else -0.8,
+                   samples=9, thin=b_end)
 
 
-def flame_lock(a, base, back, out, L, r, part="Fins", curl=1.0, samples=10):
+def flame_lock(a, base, back, out, L, r, part="Fins", curl=1.0, samples=10, thin=None):
     """Mèche de flamme : s'écarte de la peau en montant, ondule, puis file vers l'arrière et finit en pointe
     qui se relève comme une flamme. Ruban aplati (fin dans la direction « out »), plus large près de la base."""
     rel = ((0, 0), (0.22, 0.22), (0.55, 0.52), (0.98, 0.74), (1.42, 0.8), (1.8, 0.7 + 0.08 * curl),
@@ -182,7 +182,7 @@ def flame_lock(a, base, back, out, L, r, part="Fins", curl=1.0, samples=10):
         q = k / (samples - 1)
         radii.append(r * (min(1.0, 0.45 + q / 0.25 * 0.55) if q < 0.25 else (1 - q) / 0.75) ** 0.85)
     radii[-1] = 0.0
-    a.add(part, *tube(line, radii, 5, up=out, flat=0.42))
+    a.add(part, *tube(line, radii, 5, up=out if thin is None else thin, flat=0.42))
 
 
 def build_leg(a, hip, fwd, down, side):
@@ -892,7 +892,7 @@ def build_head(a, neck, neck_r):
 
 
 def build():
-    a = Asset("Dragon_Long_v17")
+    a = Asset("Dragon_Long_v18")
     for name, (color, mat) in COULEURS.items():
         a.part(name, color, mat)
     pts = catmull_rom(SPINE, RINGS)

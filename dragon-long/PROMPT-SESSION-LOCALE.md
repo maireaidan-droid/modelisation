@@ -1,7 +1,7 @@
-# Dragon Long v17 : import dans Roblox Studio (instructions pour une session Claude locale)
+# Dragon Long v18 : import dans Roblox Studio (instructions pour une session Claude locale)
 
 > **À coller tel quel dans une NOUVELLE conversation Claude locale** (connectée à Roblox Studio par MCP),
-> après avoir importé le fichier `Dragon_Long_v17.glb` (voir « Import »).
+> après avoir importé le fichier `Dragon_Long_v18.glb` (voir « Import »).
 
 ---
 
@@ -19,17 +19,17 @@ Parle en **français**, simplement, et explique ce que tu fais.
 ## Le modèle
 | | |
 |---|---|
-| Fichier | `Dragon_Long_v17.glb` (branche `claude/roblox-3d-dragons-t7lch1` du dépôt `maireaidan-droid/modelisation`, dossier `dragon-long/objets/`) |
-| Taille attendue | **16,5 × 19,7 × 58 studs** (largeur × hauteur × longueur) |
-| Triangles | environ 26 000 au total |
+| Fichier | `Dragon_Long_v18.glb` (branche `claude/roblox-3d-dragons-t7lch1` du dépôt `maireaidan-droid/modelisation`, dossier `dragon-long/objets/`) |
+| Taille attendue | **16,5 × 19 × 58 studs** (largeur × hauteur × longueur) |
+| Triangles | environ 28 700 au total |
 | Orientation | la **tête regarde vers +Z**, le pivot est **sous le dragon** (Y = 0), centré |
 
 ### Les 9 parties et leurs réglages
 | Partie | Rôle | Couleur | Matériau | Triangles |
 |---|---|---|---|---|
-| `Body` | écailles du corps et de la tête, écailles des joues, pattes | `#2F7D63` (jade) | SmoothPlastic | 13 886 |
+| `Body` | écailles du corps et de la tête, écailles des joues, pattes | `#2F7D63` (jade) | SmoothPlastic | 14 730 |
 | `Belly` | ventre en plaques, dessous de la mâchoire | `#E2B65C` (doré) | SmoothPlastic | 3 362 |
-| `Fins` | crinière, crête du dos, nageoires, barbichette | `#C8432F` (rouge) | SmoothPlastic | 4 034 |
+| `Fins` | crinière, crête du dos, nageoires, barbichette | `#C8432F` (rouge) | SmoothPlastic | 5 794 |
 | `Horns` | cornes, corne de nez, pointes des joues, griffes, dents | `#E6DCC3` (ivoire) | SmoothPlastic | 2 404 |
 | `Whiskers` | moustaches, sourcils en volutes, marque du front | `#F0C24B` (or) | SmoothPlastic | 1 288 |
 | `Eyes` | yeux | `#FFD23F` (jaune) | **Neon** | 96 |
@@ -38,14 +38,14 @@ Parle en **français**, simplement, et explique ce que tu fais.
 | `Tongue` | langue | `#B9434C` (rouge rosé) | SmoothPlastic | 192 |
 
 ## Import (fait par moi, à la main)
-1. Dans Studio : **Avatar → Import 3D** (ou **Fichier → Import 3D**), puis choisir `Dragon_Long_v17.glb`.
+1. Dans Studio : **Avatar → Import 3D** (ou **Fichier → Import 3D**), puis choisir `Dragon_Long_v18.glb`.
 2. Dans la fenêtre d'import :
    - unité **Stud** ;
    - parties **séparées** (ne pas fusionner) ;
    - **Anchored** coché.
 3. Le modèle arrive dans le Workspace.
 
-**Toi, vérifie la taille** avec `GetExtentsSize()` : environ 16,5 × 19,7 × 58. Si c'est environ 3,5 fois trop grand ou trop petit, c'est l'unité : dis-le-moi pour que je réimporte (le format `.glb` est prévu en mètres). Vérifie aussi que les **9 parties** sont là avec les bons noms. Si Studio les a renommées (par exemple `Body_Mesh`), renomme-les comme dans le tableau.
+**Toi, vérifie la taille** avec `GetExtentsSize()` : environ 16,5 × 19 × 58. Si c'est environ 3,5 fois trop grand ou trop petit, c'est l'unité : dis-le-moi pour que je réimporte (le format `.glb` est prévu en mètres). Vérifie aussi que les **9 parties** sont là avec les bons noms. Si Studio les a renommées (par exemple `Body_Mesh`), renomme-les comme dans le tableau.
 
 ## A. Réglages du modèle
 1. Range le modèle dans `ServerStorage > Dragons` (crée le dossier s'il n'existe pas) et nomme-le `Dragon_Long`.
@@ -71,7 +71,7 @@ Un `PointLight` jaune très discret dans `Eyes` (Brightness 0,5, Range 6, `Shado
 
 ## D. Vérifications finales
 - Lance le jeu et lis la console : **aucune erreur rouge**.
-- Simulateur d'appareil **téléphone** : la scène reste fluide avec le dragon visible. Avec environ 26 000 triangles, un dragon à l'écran ne pose pas de problème ; s'il en faut beaucoup, dis-le-moi, il faudra une version allégée.
+- Simulateur d'appareil **téléphone** : la scène reste fluide avec le dragon visible. Avec environ 28 700 triangles, un dragon à l'écran ne pose pas de problème ; s'il en faut beaucoup, dis-le-moi, il faudra une version allégée.
 - Récapitule-moi ce que tu as fait, où est rangé le modèle, et ce qui reste à faire.
 
 ## Pour plus tard (ne pas faire maintenant)
