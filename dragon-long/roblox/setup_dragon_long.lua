@@ -1,9 +1,9 @@
 --[[
-Dragon Long v10 : réglages automatiques après l'import dans Roblox Studio.
+Dragon Long v11 : réglages automatiques après l'import dans Roblox Studio.
 
 Utilisation :
-  1. Importer Dragon_Long_v10.glb (Avatar > Import 3D, unité Stud, parties séparées, Anchored).
-  2. Sélectionner le modèle importé dans l'Explorer (sinon le script cherche « Dragon_Long_v10 » dans le Workspace).
+  1. Importer Dragon_Long_v11.glb (Avatar > Import 3D, unité Stud, parties séparées, Anchored).
+  2. Sélectionner le modèle importé dans l'Explorer (sinon le script cherche un modèle « Dragon_Long_v… » dans le Workspace).
   3. Affichage > Barre de commande (View > Command Bar), coller TOUT ce script, Entrée.
 
 Le script :
@@ -34,7 +34,12 @@ local EXPECTED_LENGTH = 58 -- studs, environ
 -- 1. Trouver le modèle
 local model = Selection:Get()[1]
 if not (model and model:IsA("Model")) then
-	model = workspace:FindFirstChild("Dragon_Long_v10", true)
+	model = workspace:FindFirstChild("Dragon_Long_v11", true)
+end
+if not (model and model:IsA("Model")) then
+	for _, m in ipairs(workspace:GetDescendants()) do
+		if m:IsA("Model") and string.sub(m.Name, 1, 13) == "Dragon_Long_v" then model = m break end
+	end
 end
 if not (model and model:IsA("Model")) then
 	warn("[Dragon] Modèle introuvable : sélectionne le modèle importé dans l'Explorer puis relance le script.")

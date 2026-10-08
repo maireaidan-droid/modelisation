@@ -1,7 +1,7 @@
-# Dragon Long v10 : import dans Roblox Studio (instructions pour une session Claude locale)
+# Dragon Long v11 : import dans Roblox Studio (instructions pour une session Claude locale)
 
 > **À coller tel quel dans une NOUVELLE conversation Claude locale** (connectée à Roblox Studio par MCP),
-> après avoir importé le fichier `Dragon_Long_v10.glb` (voir « Import »).
+> après avoir importé le fichier `Dragon_Long_v11.glb` (voir « Import »).
 
 ---
 
@@ -19,7 +19,7 @@ Parle en **français**, simplement, et explique ce que tu fais.
 ## Le modèle
 | | |
 |---|---|
-| Fichier | `Dragon_Long_v10.glb` (branche `claude/roblox-3d-dragons-t7lch1` du dépôt `maireaidan-droid/modelisation`, dossier `dragon-long/objets/`) |
+| Fichier | `Dragon_Long_v11.glb` (branche `claude/roblox-3d-dragons-t7lch1` du dépôt `maireaidan-droid/modelisation`, dossier `dragon-long/objets/`) |
 | Taille attendue | **14,5 × 19,2 × 58 studs** (largeur × hauteur × longueur) |
 | Triangles | environ 14 400 au total |
 | Orientation | la **tête regarde vers +Z**, le pivot est **sous le dragon** (Y = 0), centré |
@@ -38,7 +38,7 @@ Parle en **français**, simplement, et explique ce que tu fais.
 | `Tongue` | langue | `#B9434C` (rouge rosé) | SmoothPlastic | 192 |
 
 ## Import (fait par moi, à la main)
-1. Dans Studio : **Avatar → Import 3D** (ou **Fichier → Import 3D**), puis choisir `Dragon_Long_v10.glb`.
+1. Dans Studio : **Avatar → Import 3D** (ou **Fichier → Import 3D**), puis choisir `Dragon_Long_v11.glb`.
 2. Dans la fenêtre d'import :
    - unité **Stud** ;
    - parties **séparées** (ne pas fusionner) ;

@@ -3,13 +3,14 @@
 Modèle low-poly à facettes pour Roblox, inspiré du dragon chinois (Long) : corps de serpent en S,
 ventre doré, crinière et épines rouges, cornes en bois de cerf, moustaches, 4 pattes à 3 griffes, yeux qui brillent.
 
-![aperçu v10](apercu-Dragon_Long_v10.png)
+![aperçu v11](apercu-Dragon_Long_v11.png)
 
-Comparaisons : [museau v9 / v10](comparaison-nez-Dragon_Long_v9-Dragon_Long_v10.png) · [gueule v9 / v10](comparaison-gueule-Dragon_Long_v9-Dragon_Long_v10.png) · [gueule v8 / v9](comparaison-gueule-Dragon_Long_v8-Dragon_Long_v9.png) · [nez v7 / v8](comparaison-nez-Dragon_Long_v7-Dragon_Long_v8.png) · [nez v4 / v7](comparaison-nez-Dragon_Long_v4-Dragon_Long_v7.png) · [yeux v6 / v7](comparaison-yeux-Dragon_Long_v6-Dragon_Long_v7.png) · [nez v4 / v5](comparaison-nez-Dragon_Long_v4-Dragon_Long_v5.png) · [yeux v5 / v6](comparaison-yeux-Dragon_Long_v5-Dragon_Long_v6.png) · [nez v5 / v6](comparaison-nez-Dragon_Long_v5-Dragon_Long_v6.png)
+Comparaisons : [museau v10 / v11](comparaison-nez-Dragon_Long_v10-Dragon_Long_v11.png) · [gueule v10 / v11](comparaison-gueule-Dragon_Long_v10-Dragon_Long_v11.png) · [museau v9 / v10](comparaison-nez-Dragon_Long_v9-Dragon_Long_v10.png) · [gueule v9 / v10](comparaison-gueule-Dragon_Long_v9-Dragon_Long_v10.png) · [gueule v8 / v9](comparaison-gueule-Dragon_Long_v8-Dragon_Long_v9.png) · [nez v7 / v8](comparaison-nez-Dragon_Long_v7-Dragon_Long_v8.png) · [nez v4 / v7](comparaison-nez-Dragon_Long_v4-Dragon_Long_v7.png) · [yeux v6 / v7](comparaison-yeux-Dragon_Long_v6-Dragon_Long_v7.png) · [nez v4 / v5](comparaison-nez-Dragon_Long_v4-Dragon_Long_v5.png) · [yeux v5 / v6](comparaison-yeux-Dragon_Long_v5-Dragon_Long_v6.png) · [nez v5 / v6](comparaison-nez-Dragon_Long_v5-Dragon_Long_v6.png)
 
 | Version | Fichier | Triangles | Nouveautés |
 |---|---|---|---|
-| **v10** (actuelle) | `objets/Dragon_Long_v10.glb` | 14 364 | museau affiné : −26 % en largeur et −20 % en hauteur par le dessus, avec une transition douce après les yeux ; mâchoire, lèvres, dents, langue et départ des moustaches suivent (réglable avec `MUZZLE_W` et `MUZZLE_H`) |
+| **v11** (actuelle) | `objets/Dragon_Long_v11.glb` | 14 364 | mâchoire supérieure affinée en hauteur : dessus du museau −38 %, dessous remonté de 22 % ; lèvres, racines des dents et moustaches suivent (`MUZZLE_H`, `MUZZLE_HB`) |
+| v10 | `objets/Dragon_Long_v10.glb` | 14 364 | museau affiné : −26 % en largeur et −20 % en hauteur par le dessus, avec une transition douce après les yeux ; mâchoire, lèvres, dents, langue et départ des moustaches suivent (réglable avec `MUZZLE_W` et `MUZZLE_H`) ([aperçu](apercu-Dragon_Long_v10.png)) |
 | v9 | `objets/Dragon_Long_v9.glb` | 14 364 | intérieur de la gueule (gorge sombre, palais à bourrelets, plancher), langue fendue, dentition acérée : dents fines à 3 arêtes recourbées vers la gorge, longues et courtes en alternance, crocs en poignard en haut et en bas, incisives pointues ([aperçu](apercu-Dragon_Long_v9.png)) |
 | v8 | `objets/Dragon_Long_v8.glb` | 13 198 | nez agressif : arête tranchante sur le museau (dans le prolongement du pli entre les arcades), corne de nez + une plus petite, narines en fentes inclinées comme le V des arcades avec ailes évasées, rides en chevrons, bout du museau plus crochu ([aperçu](apercu-Dragon_Long_v8.png)) |
 | v7 | `objets/Dragon_Long_v7.glb` | 12 956 | nez de la v4 (museau fondu, coussinets, narines en virgule, rides du museau) + toute la zone des yeux de la v6 ([aperçu](apercu-Dragon_Long_v7.png)) |
