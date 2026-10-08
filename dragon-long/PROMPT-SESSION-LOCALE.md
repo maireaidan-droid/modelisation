@@ -21,14 +21,14 @@ Parle en **français**, simplement, et explique ce que tu fais.
 |---|---|
 | Fichier | `Dragon_Long_v12.glb` (branche `claude/roblox-3d-dragons-t7lch1` du dépôt `maireaidan-droid/modelisation`, dossier `dragon-long/objets/`) |
 | Taille attendue | **14,5 × 19,2 × 58 studs** (largeur × hauteur × longueur) |
-| Triangles | environ 14 400 au total |
+| Triangles | environ 14 500 au total |
 | Orientation | la **tête regarde vers +Z**, le pivot est **sous le dragon** (Y = 0), centré |
 
 ### Les 9 parties et leurs réglages
 | Partie | Rôle | Couleur | Matériau | Triangles |
 |---|---|---|---|---|
-| `Body` | écailles du corps et de la tête, pattes | `#2F7D63` (jade) | SmoothPlastic | 6 608 |
-| `Belly` | ventre en plaques, dessous de la mâchoire | `#E2B65C` (doré) | SmoothPlastic | 3 314 |
+| `Body` | écailles du corps et de la tête, pattes | `#2F7D63` (jade) | SmoothPlastic | 6 720 |
+| `Belly` | ventre en plaques, dessous de la mâchoire | `#E2B65C` (doré) | SmoothPlastic | 3 362 |
 | `Fins` | crinière, crête du dos, nageoires, barbichette | `#C8432F` (rouge) | SmoothPlastic | 1 052 |
 | `Horns` | cornes, corne de nez, griffes, dents | `#E6DCC3` (ivoire) | SmoothPlastic | 1 512 |
 | `Whiskers` | moustaches, sourcils en volutes, marque du front | `#F0C24B` (or) | SmoothPlastic | 1 288 |
@@ -71,7 +71,7 @@ Un `PointLight` jaune très discret dans `Eyes` (Brightness 0,5, Range 6, `Shado
 
 ## D. Vérifications finales
 - Lance le jeu et lis la console : **aucune erreur rouge**.
-- Simulateur d'appareil **téléphone** : la scène reste fluide avec le dragon visible. Avec environ 14 400 triangles, un ou deux dragons à l'écran ne posent pas de problème ; s'il en faut beaucoup, dis-le-moi, il faudra une version allégée.
+- Simulateur d'appareil **téléphone** : la scène reste fluide avec le dragon visible. Avec environ 14 500 triangles, un ou deux dragons à l'écran ne posent pas de problème ; s'il en faut beaucoup, dis-le-moi, il faudra une version allégée.
 - Récapitule-moi ce que tu as fait, où est rangé le modèle, et ce qui reste à faire.
 
 ## Pour plus tard (ne pas faire maintenant)
