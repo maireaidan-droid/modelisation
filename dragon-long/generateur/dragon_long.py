@@ -1,6 +1,7 @@
 # Dragon Long (dragon chinois) stylisé, low-poly.
 # v1 : premier croquis. v2 : écailles en relief sur le dos, plaques sur le ventre, crête plus fournie, yeux retravaillés.
 # v3 : tête plus grande et sculptée (nez de félin, sourcils dorés en volutes, barbichette, joues, rides du museau).
+# v16 : gueule entièrement rouge à l'intérieur (la peau elle-même est colorée, plus rien ne dépasse), corps épaissi.
 # v15 : intérieur de la gueule tapissé d'un rouge uniforme (gorge, palais, plancher, gencives le long des dents).
 # v14 : peau du visage en écailles couchées (plaques presque à plat, bord arrière à peine soulevé) au lieu de pointes.
 # v13 : mâchoire du bas un peu affinée ; peau du visage : écailles-tuiles graduées sur le front et le chanfrein qui
@@ -57,8 +58,8 @@ SPINE = [
 def body_radius(t):
     """Fin au cou, épais au premier tiers, puis s'affine jusqu'à la queue."""
     if t < 0.2:
-        return 1.35 + (1.85 - 1.35) * (t / 0.2)
-    return 1.85 - (1.85 - 0.28) * ((t - 0.2) / 0.8) ** 1.1
+        return 1.5 + (2.13 - 1.5) * (t / 0.2)
+    return 2.13 - (2.13 - 0.32) * ((t - 0.2) / 0.8) ** 1.1
 
 
 def build_body(a, pts, T, N, B, radii):
@@ -169,7 +170,7 @@ def build_leg(a, hip, fwd, down, side):
     knee = hip + side * 1.9 - down * 0.4 + fwd * 0.6
     ankle = knee + down * 2.0 + fwd * 1.0 + side * 0.2
     foot = ankle + down * 0.5 + fwd * 0.5
-    a.add("Body", *tube([hip, knee, ankle, foot], [0.75, 0.55, 0.42, 0.4], 6, tip=False))
+    a.add("Body", *tube([hip, knee, ankle, foot], [0.86, 0.63, 0.48, 0.45], 6, tip=False))
     # Petite nageoire au coude.
     a.add("Fins", *fin(knee - fwd * 0.2 + down * 0.3, knee + fwd * 0.5, knee - fwd * 1.6 - down * 0.6 + side * 0.4,
                        np.cross(fwd, side), 0.1))
@@ -407,6 +408,25 @@ def skull_top(x):
     return yc + ht
 
 
+def face_normals(verts, faces):
+    tri = np.asarray(verts)[np.asarray(faces)]
+    n = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])
+    return tri.mean(axis=1), n / (np.linalg.norm(n, axis=1, keepdims=True) + 1e-12)
+
+
+def mouth_labels_skull(verts, faces):
+    """Dessous de la mâchoire supérieure, entre les lèvres : « Mouth » ; le reste : « Body »."""
+    cen, nrm = face_normals(verts, faces)
+    labels = []
+    for c, n in zip(cen, nrm):
+        yc, w, ht, hb = skull_section(c[0])
+        if n @ (c - np.array([c[0], yc, 0.0])) < 0:
+            n = -n
+        inside = (0.25 < c[0] < 4.4 and n[1] < -0.5 and c[1] < yc - 0.3 * hb and abs(c[2]) < w * 0.8)
+        labels.append("Mouth" if inside else "Body")
+    return np.array(labels)
+
+
 def build_head(a, neck, neck_r):
     """Tête construite dans un repère local (x vers l'avant, y en haut, z sur le côté), puis placée sur la nuque."""
     S = 1.3
@@ -430,7 +450,9 @@ def build_head(a, neck, neck_r):
     xs = np.concatenate([np.linspace(-1.4, 0.6, 3), np.linspace(0.85, 2.3, 10), np.linspace(2.6, 3.8, 4),
                          np.linspace(3.95, 4.72, 7)])
     angs = np.arange(SIDES_HEAD) * 2 * np.pi / SIDES_HEAD
-    a.add("Body", *loft([np.array([P(*skull_point(x, t)) for t in angs]) for x in xs]))
+    local = [np.array([skull_point(x, t) for t in angs]) for x in xs]
+    verts, faces = loft(local)
+    a.add_split(np.array([P(*v) for v in verts]), faces, mouth_labels_skull(verts, faces))
 
     # Narines en fentes, inclinées comme le V des arcades (bas côté milieu, haut vers l'arrière et l'extérieur),
     # avec une aile évasée en lame au-dessus de chacune.
@@ -611,7 +633,7 @@ def build_head(a, neck, neck_r):
     def jaw_bottom(x):
         return np.interp(x, [j[0] for j in JAW], [j[2] for j in JAW])
 
-    def jaw_section(x, top, bot, w, n=12, p=2.4):
+    def jaw_section(x, top, bot, w, n=16, p=2.4):
         """Section de la mâchoire : super-ellipse (flancs pleins), un peu plus large en bas qu'en haut."""
         yc, h = (top + bot) / 2, (top - bot) / 2
         out = []
@@ -622,17 +644,47 @@ def build_head(a, neck, neck_r):
             out.append(jaw_point(x, yy, zz))
         return np.array(out)
 
-    a.add("Body", *loft([jaw_section(*j) for j in JAW]))
+    jverts, jfaces = loft([jaw_section(*j) for j in JAW])
+    # Le dessus de la mâchoire (entre les dents) est l'intérieur de la gueule : rouge.
+    n_j = 16
+    ring_faces = (len(JAW) - 1) * n_j * 2
+    jlab = []
+    for i in range(len(jfaces)):
+        if i >= ring_faces:
+            jlab.append("Body")
+            continue
+        seg, k = divmod(i // 2, n_j)
+        t0, t1 = np.pi / n_j + k * 2 * np.pi / n_j, np.pi / n_j + (k + 1) * 2 * np.pi / n_j
+        top = np.sin(t0) > 0.6 and np.sin(t1) > 0.6
+        jlab.append("Mouth" if top and JAW[seg + 1][0] <= 3.96 else "Body")
+    a.add_split(jverts, jfaces, np.array(jlab))
     # Bande dorée sous la mâchoire, qui suit le nouveau dessous.
     a.add("Belly", *loft([jaw_section(x, jaw_bottom(x) + 0.42, jaw_bottom(x) - 0.04, w * 0.72, 10)
                           for x, w in ((0.4, 1.15), (1.6, 1.0), (2.8, 0.88), (3.6, 0.7))]))
+    def add_lip(line, radii, inward):
+        """Bourrelet de lèvre : la moitié tournée vers l'intérieur de la gueule est rouge."""
+        verts, faces = tube(line, radii, 6)
+        cen, nrm = face_normals(verts, faces)
+        line = np.asarray(line)
+        lab = []
+        for c, n in zip(cen, nrm):
+            p = line[np.argmin(np.linalg.norm(line - c, axis=1))]
+            out = normalize(c - p)
+            lab.append("Mouth" if out @ inward > 0.2 else "Body")
+        a.add_split(verts, faces, np.array(lab))
+
     # Lèvre du haut en bourrelet, qui remonte au coin de la gueule.
     for side in (1, -1):
         lip = [Pm(x, y + jaw_lift(x), z * side) for x, y, z in
                ((0.5, -0.25, 1.45), (1.2, -0.6, 1.35), (2.2, -0.75, 1.2), (3.2, -0.78, 1.1), (3.9, -0.72, 0.95))]
-        a.add("Body", *tube(catmull_rom(lip, 9), [0.06, 0.12, 0.15, 0.16, 0.16, 0.15, 0.14, 0.12, 0.05], 5))
-        low = [jaw_point(x, -0.62, w * muzzle_w(x) * side) for x, w in ((0.9, 1.15), (2.0, 1.02), (3.0, 0.92), (3.9, 0.72))]
-        a.add("Body", *tube(low, [0.05, 0.1, 0.1, 0.04], 5))
+        lip_line = catmull_rom(lip, 9)
+        add_lip(lip_line, [0.06, 0.12, 0.15, 0.16, 0.16, 0.15, 0.14, 0.12, 0.05], normalize(-s * side - u * 0.8))
+        # Lèvre du bas posée sur le bord de la mâchoire, à la ligne des dents : elle cache le bord de l'intérieur rouge.
+        jw = lambda x: np.interp(x, [j[0] for j in JAW], [j[3] for j in JAW]) * muzzle_w(x)
+        jt = lambda x: np.interp(x, [j[0] for j in JAW], [j[1] for j in JAW])
+        low = [jaw_point(x, jt(x) - 0.04, jw(x) * 0.84 * side) for x in (0.5, 1.3, 2.1, 2.9, 3.6, 4.0)]
+        add_lip(catmull_rom(low, 10), [0.04, 0.1, 0.12, 0.12, 0.12, 0.12, 0.12, 0.11, 0.08, 0.03],
+                normalize(-s * side + u * 0.8))
 
     def jaw_up(x):
         return normalize(jaw_point(x, 0.0, 0.0) - jaw_point(x, -1.0, 0.0))
@@ -640,11 +692,11 @@ def build_head(a, neck, neck_r):
     def jaw_top(x):
         return np.interp(x, [0.2, 1.6, 3.0, 3.8, 4.15], [-0.43, -0.59, -0.63, -0.6, -0.7])
 
-    # Intérieur de la gueule : la gorge sombre au fond, un palais fin en haut et un plancher fin en bas.
-    # La langue repose sur le plancher. On ne voit plus « à travers » la gueule.
+    # Intérieur de la gueule : la gorge au fond ferme la gueule ; le palais et le plancher sont la peau
+    # elle-même, colorée en rouge (voir mouth_labels_skull et la mâchoire).
     def mouth_w(x):
         yc, w, ht, hb = skull_section(x)
-        return min(w, 1.15) * (0.82 if x < 3.6 else 0.62)
+        return min(w, 1.15) * 0.7
 
     rings = []
     for x in (-0.2, 0.6, 1.2):
@@ -655,20 +707,6 @@ def build_head(a, neck, neck_r):
                                jaw_point(x, bot_y, -wz * 0.55), jaw_point(x, bot_y - 0.04, 0.0),
                                jaw_point(x, bot_y, wz * 0.55), jaw_point(x, bot_y + 0.12, wz), P(x, top_y - 0.15, wz)]))
     a.add("Mouth", *loft(rings))
-    palate, floor = [], []
-    for x in (0.9, 1.8, 2.8, 3.55, 3.95):
-        yc, w, ht, hb = skull_section(x)
-        y0, wz = yc - hb, mouth_w(x)
-        palate.append(np.array([P(x, y0 + 0.12, wz), P(x, y0 + 0.12, -wz), P(x, y0 - 0.1, -wz * 0.95),
-                                P(x, y0 - 0.06, 0.0), P(x, y0 - 0.1, wz * 0.95)]))
-        if x < 3.9:
-            j0 = jaw_top(x)
-            jw = np.interp(x, [j[0] for j in JAW], [j[3] for j in JAW]) * muzzle_w(x) * 0.8    # jusqu'aux dents
-            floor.append(np.array([jaw_point(x, j0 - 0.22, jw), jaw_point(x, j0 - 0.22, -jw),
-                                   jaw_point(x, j0 + 0.05, -jw * 0.95), jaw_point(x, j0 + 0.01, 0.0),
-                                   jaw_point(x, j0 + 0.05, jw * 0.95)]))
-    a.add("Mouth", *loft(palate))
-    a.add("Mouth", *loft(floor))
     # Palais : 4 bourrelets en travers, visibles quand on regarde dans la gueule.
     for x in (1.6, 2.2, 2.8, 3.35):
         yc, w, ht, hb = skull_section(x)
@@ -688,19 +726,6 @@ def build_head(a, neck, neck_r):
         fork = [b0, b0 + (f * 0.25 + s * side * 0.12) * S + jaw_up(3.6) * 0.12 * S,
                 b0 + (f * 0.45 + s * side * 0.25) * S + jaw_up(3.6) * 0.32 * S]
         a.add("Tongue", *tube(fork, [0.15, 0.1, 0.0], 6, up=jaw_up(3.6), flat=0.5))
-
-    # Gencives rouges le long des 2 rangées de dents : plus de peau verte visible dans la gueule.
-    for side in (1, -1):
-        up_g = []
-        for x in np.linspace(0.9, 4.15, 12):
-            yc, w, ht, hb = skull_section(x)
-            up_g.append(P(x, -0.68 + jaw_lift(x), side * min(w, 1.2) * 0.86))
-        a.add("Mouth", *tube(up_g, [0.0] + [0.12] * 10 + [0.0], 6))
-        lo_g = []
-        for x in np.linspace(1.0, 4.0, 11):
-            w = np.interp(x, [0.2, 1.6, 3.0, 3.8], [1.25, 1.08, 0.95, 0.82]) * 0.82 * muzzle_w(x)
-            lo_g.append(jaw_point(x, jaw_top(x) + 0.02, w * side * 0.98))
-        a.add("Mouth", *tube(lo_g, [0.0] + [0.11] * 9 + [0.0], 6))
 
     # Dentition acérée : dents fines à 3 faces (arêtes tranchantes), recourbées vers la gorge,
     # longues et courtes en alternance, crocs en poignard et incisives pointues devant.
@@ -818,7 +843,7 @@ def build_head(a, neck, neck_r):
 
 
 def build():
-    a = Asset("Dragon_Long_v15")
+    a = Asset("Dragon_Long_v16")
     for name, (color, mat) in COULEURS.items():
         a.part(name, color, mat)
     pts = catmull_rom(SPINE, RINGS)

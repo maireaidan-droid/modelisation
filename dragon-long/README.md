@@ -3,13 +3,14 @@
 Modèle low-poly à facettes pour Roblox, inspiré du dragon chinois (Long) : corps de serpent en S,
 ventre doré, crinière et épines rouges, cornes en bois de cerf, moustaches, 4 pattes à 3 griffes, yeux qui brillent.
 
-![aperçu v15](apercu-Dragon_Long_v15.png)
+![aperçu v16](apercu-Dragon_Long_v16.png)
 
-Comparaisons : [gueule v14 / v15](comparaison-gueule-Dragon_Long_v14-Dragon_Long_v15.png) · [peau v13 / v14](comparaison-yeux-Dragon_Long_v13-Dragon_Long_v14.png) · [peau yeux/front v12 / v13](comparaison-yeux-Dragon_Long_v12-Dragon_Long_v13.png) · [peau museau v12 / v13](comparaison-nez-Dragon_Long_v12-Dragon_Long_v13.png) · [gueule v11 / v12](comparaison-gueule-Dragon_Long_v11-Dragon_Long_v12.png) · [museau v10 / v11](comparaison-nez-Dragon_Long_v10-Dragon_Long_v11.png) · [gueule v10 / v11](comparaison-gueule-Dragon_Long_v10-Dragon_Long_v11.png) · [museau v9 / v10](comparaison-nez-Dragon_Long_v9-Dragon_Long_v10.png) · [gueule v9 / v10](comparaison-gueule-Dragon_Long_v9-Dragon_Long_v10.png) · [gueule v8 / v9](comparaison-gueule-Dragon_Long_v8-Dragon_Long_v9.png) · [nez v7 / v8](comparaison-nez-Dragon_Long_v7-Dragon_Long_v8.png) · [nez v4 / v7](comparaison-nez-Dragon_Long_v4-Dragon_Long_v7.png) · [yeux v6 / v7](comparaison-yeux-Dragon_Long_v6-Dragon_Long_v7.png) · [nez v4 / v5](comparaison-nez-Dragon_Long_v4-Dragon_Long_v5.png) · [yeux v5 / v6](comparaison-yeux-Dragon_Long_v5-Dragon_Long_v6.png) · [nez v5 / v6](comparaison-nez-Dragon_Long_v5-Dragon_Long_v6.png)
+Comparaisons : [gueule v15 / v16](comparaison-gueule-Dragon_Long_v15-Dragon_Long_v16.png) · [gueule v14 / v15](comparaison-gueule-Dragon_Long_v14-Dragon_Long_v15.png) · [peau v13 / v14](comparaison-yeux-Dragon_Long_v13-Dragon_Long_v14.png) · [peau yeux/front v12 / v13](comparaison-yeux-Dragon_Long_v12-Dragon_Long_v13.png) · [peau museau v12 / v13](comparaison-nez-Dragon_Long_v12-Dragon_Long_v13.png) · [gueule v11 / v12](comparaison-gueule-Dragon_Long_v11-Dragon_Long_v12.png) · [museau v10 / v11](comparaison-nez-Dragon_Long_v10-Dragon_Long_v11.png) · [gueule v10 / v11](comparaison-gueule-Dragon_Long_v10-Dragon_Long_v11.png) · [museau v9 / v10](comparaison-nez-Dragon_Long_v9-Dragon_Long_v10.png) · [gueule v9 / v10](comparaison-gueule-Dragon_Long_v9-Dragon_Long_v10.png) · [gueule v8 / v9](comparaison-gueule-Dragon_Long_v8-Dragon_Long_v9.png) · [nez v7 / v8](comparaison-nez-Dragon_Long_v7-Dragon_Long_v8.png) · [nez v4 / v7](comparaison-nez-Dragon_Long_v4-Dragon_Long_v7.png) · [yeux v6 / v7](comparaison-yeux-Dragon_Long_v6-Dragon_Long_v7.png) · [nez v4 / v5](comparaison-nez-Dragon_Long_v4-Dragon_Long_v5.png) · [yeux v5 / v6](comparaison-yeux-Dragon_Long_v5-Dragon_Long_v6.png) · [nez v5 / v6](comparaison-nez-Dragon_Long_v5-Dragon_Long_v6.png)
 
 | Version | Fichier | Triangles | Nouveautés |
 |---|---|---|---|
-| **v15** (actuelle) | `objets/Dragon_Long_v15.glb` | 21 198 | intérieur de la gueule tapissé d'un rouge uniforme (`#8E2529`) : gorge, palais, plancher élargi jusqu'aux dents, gencives le long des 2 rangées de dents |
+| **v16** (actuelle) | `objets/Dragon_Long_v16.glb` | 20 912 | intérieur de la gueule entièrement rouge : la peau elle-même est colorée (dessous de la mâchoire du haut, dessus de la mâchoire du bas, intérieur des lèvres), plus de plaques qui dépassent ; lèvre du bas recalée à la ligne des dents ; corps épaissi de 15 % (pattes en proportion) |
+| v15 | `objets/Dragon_Long_v15.glb` | 21 198 | intérieur de la gueule tapissé d'un rouge uniforme (`#8E2529`) : gorge, palais, plancher élargi jusqu'aux dents, gencives le long des 2 rangées de dents ([aperçu](apercu-Dragon_Long_v15.png)) |
 | v14 | `objets/Dragon_Long_v14.glb` | 20 742 | peau du visage en écailles couchées : boucliers à 6 côtés presque plats qui se chevauchent comme des tuiles (bord avant enfoncé, bord arrière à peine soulevé), allongés sur le front, ronds sur les joues ([aperçu](apercu-Dragon_Long_v14.png)) |
 | v13 | `objets/Dragon_Long_v13.glb` | 19 438 | mâchoire du bas un peu affinée ; peau du visage : écailles-tuiles sur le front et le chanfrein (grandes au milieu, petites vers les yeux et la truffe) qui deviennent progressivement des galets ronds sur les joues, les paupières et sous les yeux ; truffe et lèvres lisses avec quelques pores ; plis profonds (entre les sourcils, chanfrein, sous les yeux, coin de la gueule) ; rangée de petites pointes le long des joues ([aperçu](apercu-Dragon_Long_v13.png)) |
 | v12 | `objets/Dragon_Long_v12.glb` | 14 524 | mâchoire du bas avec du volume : plus profonde, section arrondie, joues musclées vers l'articulation, menton marqué ; dents, langue, bande dorée et barbichette suivent ([aperçu](apercu-Dragon_Long_v12.png)) |
@@ -26,7 +27,7 @@ Comparaisons : [gueule v14 / v15](comparaison-gueule-Dragon_Long_v14-Dragon_Long
 | v2 | `objets/Dragon_Long_v2.glb` | 8 896 | écailles en relief sur le dos, plaques sur le ventre, crête de triangles plus fournie, yeux en amande avec pupille fendue, paupières et arcades ([aperçu](apercu-Dragon_Long_v2.png)) |
 | v1 | `objets/Dragon_Long_v1.glb` | 3 032 | premier croquis ([aperçu](apercu-Dragon_Long_v1.png)) |
 
-- Taille : 14,5 × 19 × 58 studs
+- Taille : 14,8 × 19,3 × 58 studs
 - **Couleurs et matériaux** de chaque partie : `objets/manifest.json`
 
 | Partie | Couleur | Matériau |
