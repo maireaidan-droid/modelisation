@@ -126,3 +126,39 @@ Points faibles connus des IA 3D sur ce sujet :
 - éléments fins (moustaches, mèches, dents) fusionnés ou cassés → les ajouter à la main ;
 - symétrie approximative → toujours forcer la symétrie ;
 - détails d'écailles « peints » dans la texture plutôt que sculptés → demander *sculpted / displacement*, désactiver la texture.
+
+---
+
+## 7. Prompts ciblés : nez et zone des yeux
+
+### Nez
+```
+Close-up of an eastern dragon nose, digital sculpture, clay render.
+Broad bulbous feline snout, rounded fleshy nose pad split by a deep vertical groove,
+two large round flared nostrils facing forward with thick rolled rims,
+nostrils deeply carved with dark shadowed interiors, puffy upper lip lobes under the nose,
+short nose bridge covered in small overlapping scales that blend into smooth skin
+at the tip, horizontal wrinkle folds across the bridge, fine pebbled skin pores,
+symmetrical, highly detailed sculpted surface, no texture color.
+```
+
+### Zone des yeux
+```
+Close-up of an eastern dragon eye area, digital sculpture, clay render.
+Massive overhanging brow ridges forming a deep angry V-shaped frown,
+thick fleshy brow folds pressing down on the eyes, deeply recessed narrow
+almond eyes set in dark eye sockets, heavy hooded upper eyelids,
+puffy rounded under-eye bags with stacked wrinkle folds, strong cheekbone bulges,
+deep furrow between the brows running down to the nose bridge,
+forehead above the brows covered in overlapping diamond scales,
+pebbled reptile skin on the lids and cheeks, symmetrical, highly detailed sculpted surface.
+```
+
+### Retouches
+| Objectif | Prompt |
+|---|---|
+| Narines plus marquées | `larger, rounder nostrils with thicker rims, deeper dark cavities` |
+| Nez plus félin | `wider flatter nose pad, deeper central groove, shorter bridge` |
+| Sourcils plus lourds | `heavier brow ridges overhanging the eyes, deeper V frown` |
+| Yeux plus enfoncés | `push the eyes deeper into the sockets, narrower lids, stronger shadow` |
+| Poches sous les yeux | `more pronounced puffy under-eye folds, layered wrinkles` |
