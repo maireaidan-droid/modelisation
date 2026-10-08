@@ -3,11 +3,12 @@
 Modèle low-poly à facettes pour Roblox, inspiré du dragon chinois (Long) : corps de serpent en S,
 ventre doré, crinière et épines rouges, cornes en bois de cerf, moustaches, 4 pattes à 3 griffes, yeux qui brillent.
 
-![aperçu v4](apercu-Dragon_Long_v4.png)
+![aperçu v5](apercu-Dragon_Long_v5.png)
 
 | Version | Fichier | Triangles | Nouveautés |
 |---|---|---|---|
-| **v4** (actuelle) | `objets/Dragon_Long_v4.glb` | 11 986 | nez fondu dans le crâne : truffe, coussinets et sillon sculptés dans la même peau ; yeux enfoncés dans des orbites sous une arcade, avec pommettes |
+| **v5** (actuelle) | `objets/Dragon_Long_v5.glb` | 12 928 | gueule habitée : gorge sombre, palais à bourrelets, langue fendue, rangées de dents en haut et en bas avec incisives ; yeux plus grands et tournés vers l'avant pour être vus de face |
+| v4 | `objets/Dragon_Long_v4.glb` | 11 986 | nez fondu dans le crâne : truffe, coussinets et sillon sculptés dans la même peau ; yeux enfoncés dans des orbites sous une arcade, avec pommettes ([aperçu](apercu-Dragon_Long_v4.png)) |
 | v3 | `objets/Dragon_Long_v3.glb` | 11 396 | tête plus grande (×1,3) et sculptée : nez de félin (truffe, narines, coussinets des moustaches, rides du chanfrein), sourcils dorés en volutes, barbichette, pommettes et joues en flammes, lèvres, marque dorée sur le front ([aperçu](apercu-Dragon_Long_v3.png)) |
 | v2 | `objets/Dragon_Long_v2.glb` | 8 896 | écailles en relief sur le dos, plaques sur le ventre, crête de triangles plus fournie, yeux en amande avec pupille fendue, paupières et arcades ([aperçu](apercu-Dragon_Long_v2.png)) |
 | v1 | `objets/Dragon_Long_v1.glb` | 3 032 | premier croquis ([aperçu](apercu-Dragon_Long_v1.png)) |
@@ -24,6 +25,8 @@ ventre doré, crinière et épines rouges, cornes en bois de cerf, moustaches, 4
 | Whiskers (moustaches ; à partir de la v3, aussi les sourcils et la marque du front) | `#F0C24B` or | SmoothPlastic |
 | Eyes | `#FFD23F` | **Neon** |
 | Pupils (pupilles ; à partir de la v3, aussi les narines) | `#17120E` presque noir | SmoothPlastic |
+| Mouth (v5 : gorge, palais) | `#3A1013` rouge très sombre | SmoothPlastic |
+| Tongue (v5 : langue) | `#B9434C` rouge rosé | SmoothPlastic |
 
 ## Import dans Roblox Studio
 **Avatar → Import 3D**, unité **Stud**, parties séparées. Le pivot est sous le dragon (Y = 0) et la tête regarde vers +Z.

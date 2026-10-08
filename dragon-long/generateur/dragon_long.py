@@ -1,6 +1,7 @@
 # Dragon Long (dragon chinois) stylisé, low-poly.
 # v1 : premier croquis. v2 : écailles en relief sur le dos, plaques sur le ventre, crête plus fournie, yeux retravaillés.
 # v3 : tête plus grande et sculptée (nez de félin, sourcils dorés en volutes, barbichette, joues, rides du museau).
+# v5 : gueule avec intérieur sombre, palais, langue et vraies rangées de dents ; yeux avancés pour être vus de face.
 # v4 : nez fondu dans le crâne (truffe, coussinets et sillon sculptés dans la même peau), yeux enfoncés dans des orbites.
 # Corps de serpent en S, ventre doré, crinière et nageoires rouges, cornes en bois de cerf,
 # moustaches, 4 pattes à 3 griffes. Repère Roblox : Y en haut, 1 unité = 1 stud, la tête regarde vers +Z.
@@ -14,7 +15,9 @@ COULEURS = {
     "Horns": ("#E6DCC3", "SmoothPlastic"),     # cornes, griffes, dents
     "Whiskers": ("#F0C24B", "SmoothPlastic"),  # moustaches
     "Eyes": ("#FFD23F", "Neon"),               # yeux qui brillent
-    "Pupils": ("#17120E", "SmoothPlastic"),    # pupilles fendues
+    "Pupils": ("#17120E", "SmoothPlastic"),    # pupilles fendues, narines
+    "Mouth": ("#3A1013", "SmoothPlastic"),     # intérieur de la gueule, palais, gencives
+    "Tongue": ("#B9434C", "SmoothPlastic"),    # langue
 }
 
 SIDES = 8          # côtés du corps (8 = bien facetté, léger pour téléphone)
@@ -180,12 +183,12 @@ def build_eye(a, P, f, u, side_v, S):
     sd = 1 if side_v @ np.cross(u, f) > 0 else -1
     ex, ey = EYE
     c = P(ex, ey, (skull_side(ex, ey) + 0.02) * sd)              # posé au fond de l'orbite
-    out = normalize(side_v + f * 0.45 + u * 0.1)              # l'œil regarde un peu vers l'avant
+    out = normalize(side_v + f * 0.95 + u * 0.12)             # l'œil regarde vers l'avant : visible de face
     e1 = normalize(f - out * (f @ out) - u * 0.22)            # grand axe, coin arrière relevé
     e2 = normalize(np.cross(out, e1))
     if e2 @ u < 0:
         e2 = -e2
-    L, Hh, D = 0.55 * S, 0.33 * S, 0.2 * S
+    L, Hh, D = 0.6 * S, 0.37 * S, 0.21 * S
 
     # Amande : anneaux le long du grand axe.
     rings = [c - e1 * L]
@@ -225,7 +228,7 @@ SKULL = [
     (4.72, -0.08, 0.5, 0.44, 0.38),
 ]
 SUPER = 2.6   # > 2 : section plus carrée, joues pleines
-EYE = (1.5, 0.5)  # centre de l'œil (x, y) dans le repère de la tête
+EYE = (1.78, 0.55)  # centre de l'œil (x, y) dans le repère de la tête
 
 
 def gauss(v):
@@ -359,15 +362,89 @@ def build_head(a, neck, neck_r):
         low = [jaw_point(x, -0.62, w * side) for x, w in ((0.9, 1.15), (2.0, 1.02), (3.0, 0.92), (3.9, 0.72))]
         a.add("Body", *tube(low, [0.05, 0.1, 0.1, 0.04], 5))
 
-    # Dents : crocs en haut, plus petites dents, et 2 crocs en bas.
-    for x, z, L in ((3.85, 0.85, 0.8), (3.35, 0.98, 0.35), (2.85, 1.05, 0.32), (2.3, 1.12, 0.3)):
-        for side in (1, -1):
-            top = P(x, -0.7, z * side)
-            a.add("Horns", *tube([top, P(x + 0.05, -0.7 - L * 0.6, z * side * 0.97), P(x + 0.12, -0.7 - L, z * side * 0.95)],
-                                 [0.14 if L > 0.5 else 0.09, 0.07, 0.0], 4))
+    def jaw_up(x):
+        return normalize(jaw_point(x, 0.0, 0.0) - jaw_point(x, -1.0, 0.0))
+
+    def jaw_top(x):
+        return np.interp(x, [0.2, 1.6, 3.0, 3.8, 4.15], [-0.43, -0.59, -0.63, -0.6, -0.7])
+
+    # Intérieur de la gueule : la gorge sombre au fond, un palais fin en haut et un plancher fin en bas.
+    # La langue repose sur le plancher. On ne voit plus « à travers » la gueule.
+    def mouth_w(x):
+        yc, w, ht, hb = skull_section(x)
+        return min(w, 1.15) * (0.82 if x < 3.6 else 0.62)
+
+    rings = []
+    for x in (-0.2, 0.6, 1.2):
+        yc, w, ht, hb = skull_section(x)
+        top_y, bot_y, wz = yc - hb + 0.12, jaw_top(x) - 0.08, mouth_w(x)
+        rings.append(np.array([P(x, top_y, wz * 0.55), P(x, top_y + 0.04, 0.0), P(x, top_y, -wz * 0.55),
+                               P(x, top_y - 0.15, -wz), jaw_point(x, bot_y + 0.12, -wz),
+                               jaw_point(x, bot_y, -wz * 0.55), jaw_point(x, bot_y - 0.04, 0.0),
+                               jaw_point(x, bot_y, wz * 0.55), jaw_point(x, bot_y + 0.12, wz), P(x, top_y - 0.15, wz)]))
+    a.add("Mouth", *loft(rings))
+    palate, floor = [], []
+    for x in (0.9, 1.8, 2.8, 3.55, 3.95):
+        yc, w, ht, hb = skull_section(x)
+        y0, wz = yc - hb, mouth_w(x)
+        palate.append(np.array([P(x, y0 + 0.12, wz), P(x, y0 + 0.12, -wz), P(x, y0 - 0.1, -wz * 0.95),
+                                P(x, y0 - 0.06, 0.0), P(x, y0 - 0.1, wz * 0.95)]))
+        if x < 3.9:
+            j0 = jaw_top(x)
+            floor.append(np.array([jaw_point(x, j0 - 0.2, wz * 0.9), jaw_point(x, j0 - 0.2, -wz * 0.9),
+                                   jaw_point(x, j0 + 0.04, -wz * 0.85), jaw_point(x, j0, 0.0),
+                                   jaw_point(x, j0 + 0.04, wz * 0.85)]))
+    a.add("Mouth", *loft(palate))
+    a.add("Mouth", *loft(floor))
+    # Palais : 4 bourrelets en travers, visibles quand on regarde dans la gueule.
+    for x in (1.6, 2.2, 2.8, 3.35):
+        yc, w, ht, hb = skull_section(x)
+        y0 = yc - hb + 0.1
+        ridge = [P(x + 0.12, y0, -0.62), P(x - 0.08, y0 - 0.06, -0.3), P(x - 0.12, y0 - 0.08, 0.0),
+                 P(x - 0.08, y0 - 0.06, 0.3), P(x + 0.12, y0, 0.62)]
+        a.add("Mouth", *tube(ridge, [0.0, 0.08, 0.09, 0.08, 0.0], 5))
+
+    # Langue : large et plate sur le plancher, le bout qui se relève et se fend en deux.
+    tongue = [jaw_point(x, jaw_top(x) + lift, 0.0) for x, lift in
+              ((0.6, 0.2), (1.5, 0.21), (2.4, 0.22), (3.1, 0.25), (3.55, 0.38))]
+    tl = catmull_rom(tongue, 9)
+    a.add("Tongue", *tube(tl, [0.4, 0.46, 0.48, 0.47, 0.44, 0.4, 0.35, 0.3, 0.24], 8, tip=False,
+                          up=jaw_up(2.0), flat=0.38))
     for side in (1, -1):
+        b0 = tl[-1]
+        fork = [b0, b0 + (f * 0.25 + s * side * 0.12) * S + jaw_up(3.6) * 0.12 * S,
+                b0 + (f * 0.45 + s * side * 0.25) * S + jaw_up(3.6) * 0.32 * S]
+        a.add("Tongue", *tube(fork, [0.15, 0.1, 0.0], 6, up=jaw_up(3.6), flat=0.5))
+
+    # Dents du haut : une rangée le long de la mâchoire, un gros croc, et des incisives sous le nez.
+    def upper_tooth(x, z, L, r):
+        top = P(x, -0.66, z)
+        bend = 0.97 if z else 1.0
+        a.add("Horns", *tube([top, P(x + 0.04, -0.66 - L * 0.6, z * bend), P(x + 0.1, -0.66 - L, z * bend * 0.98)],
+                             [r, r * 0.55, 0.0], 4))
+
+    for side in (1, -1):
+        for x in np.arange(1.25, 3.6, 0.32):
+            yc, w, ht, hb = skull_section(x)
+            upper_tooth(x, side * min(w, 1.2) * 0.9, 0.24 + 0.06 * ((x * 3.1) % 1), 0.08)
+        upper_tooth(3.85, 0.85 * side, 0.85, 0.15)                         # croc
+        for z in (0.2, 0.48):
+            upper_tooth(4.3 - z * 0.35, z * side, 0.22, 0.07)              # incisives
+    # Dents du bas : rangée sur la mâchoire, 2 crocs, incisives devant.
+    for side in (1, -1):
+        for x in np.arange(1.4, 3.4, 0.36):
+            w = np.interp(x, [0.2, 1.6, 3.0, 3.8], [1.25, 1.08, 0.95, 0.82]) * 0.82
+            b0 = jaw_point(x, jaw_top(x) - 0.02, w * side)
+            L = 0.2 + 0.05 * ((x * 2.3) % 1)
+            a.add("Horns", *tube([b0, b0 + jaw_up(x) * L * 0.6 * S, b0 + (jaw_up(x) * L - f * 0.04) * S],
+                                 [0.075, 0.04, 0.0], 4))
         b0 = jaw_point(3.55, -0.65, 0.66 * side)
-        a.add("Horns", *tube([b0, b0 + u * 0.38 * S, b0 + u * 0.65 * S - f * 0.05], [0.13, 0.07, 0.0], 4))
+        a.add("Horns", *tube([b0, b0 + jaw_up(3.55) * 0.4 * S, b0 + (jaw_up(3.55) * 0.68 - f * 0.05) * S],
+                             [0.14, 0.07, 0.0], 4))
+        for z in (0.18, 0.4):
+            b0 = jaw_point(4.0 - z * 0.3, -0.72, z * side)
+            a.add("Horns", *tube([b0, b0 + jaw_up(4.0) * 0.14 * S, b0 + jaw_up(4.0) * 0.24 * S + f * 0.03 * S],
+                                 [0.065, 0.035, 0.0], 4))
 
     # Yeux : amande dorée qui brille, pupille fendue, paupières.
     for side in (1, -1):
@@ -459,7 +536,7 @@ def build_head(a, neck, neck_r):
 
 
 def build():
-    a = Asset("Dragon_Long_v4")
+    a = Asset("Dragon_Long_v5")
     for name, (color, mat) in COULEURS.items():
         a.part(name, color, mat)
     pts = catmull_rom(SPINE, RINGS)
