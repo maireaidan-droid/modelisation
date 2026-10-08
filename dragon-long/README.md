@@ -37,6 +37,8 @@ Comparaisons : [museau v9 / v10](comparaison-nez-Dragon_Long_v9-Dragon_Long_v10.
 | Tongue (v5_gueule et v9 : langue) | `#B9434C` rouge rosé | SmoothPlastic |
 
 ## Import dans Roblox Studio
+Pour le faire avec une session Claude locale connectée à Studio : coller [PROMPT-SESSION-LOCALE.md](PROMPT-SESSION-LOCALE.md).
+
 **Avatar → Import 3D**, unité **Stud**, parties séparées. Le pivot est sous le dragon (Y = 0) et la tête regarde vers +Z.
 Pour les nageoires, mettre `DoubleSided = true` si elles disparaissent sous certains angles.
 
