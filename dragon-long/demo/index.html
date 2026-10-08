@@ -1,0 +1,311 @@
+<title>Dragon Long</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Nunito+Sans:wght@400;600;700&display=swap">
+<style>
+/* Plein écran : la scène 3D occupe tout, la carte d'identité en haut à gauche, les commandes en bas. Un seul univers sombre (vitrine nocturne). */
+:root {
+  color-scheme: dark;
+  --bg: #120f12;
+  --bg-glow: #2a1c1a;
+  --ink: #f3ece2;
+  --muted: #b5a99c;
+  --jade: #3fa883;
+  --gold: #e8b84f;
+  --red: #c8432f;
+  --panel: rgba(24, 19, 22, 0.78);
+  --line: rgba(232, 184, 79, 0.28);
+  --display: "Cinzel", "Trajan Pro", Georgia, serif;
+  --body: "Nunito Sans", "Segoe UI", system-ui, sans-serif;
+}
+html, body { height: 100%; }
+body {
+  background: radial-gradient(120% 90% at 50% 40%, var(--bg-glow), var(--bg) 70%);
+  color: var(--ink);
+  font-family: var(--body);
+  overflow: hidden;
+}
+#stage { position: fixed; inset: 0; }
+#stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+.card {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  left: 16px;
+  max-width: min(440px, calc(100% - 32px));
+  display: grid;
+  gap: 6px;
+  pointer-events: none;
+}
+.card h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(26px, 5vw, 40px);
+  letter-spacing: 0.06em;
+  color: var(--gold);
+  text-wrap: balance;
+}
+.card p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.45; }
+.facts { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.facts b { color: var(--ink); font-weight: 700; }
+
+.controls {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  width: max-content;
+  max-width: calc(100% - 32px);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  backdrop-filter: blur(8px);
+}
+.group { display: flex; flex-wrap: wrap; gap: 6px; }
+.sep { width: 1px; background: var(--line); align-self: stretch; }
+button {
+  font: 600 13px/1 var(--body);
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 9px 14px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+button:hover { border-color: var(--gold); }
+button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade); color: #0d1a14; }
+
+#status[hidden] { display: none; }
+#status {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  pointer-events: none;
+  text-align: center;
+  padding-inline: 16px;
+}
+.hint { position: fixed; right: 16px; top: calc(env(safe-area-inset-top, 0px) + 20px); font-size: 12px; color: var(--muted); }
+@media (max-width: 560px) {
+  .hint { display: none; }
+  .sep { display: none; }
+}
+</style>
+
+<div id="stage"></div>
+
+<header class="card">
+  <h1>Dragon Long</h1>
+  <p>Dragon chinois low-poly pour Roblox, version 18. Fais-le tourner, zoome, ou lance le vol.</p>
+  <div class="facts">
+    <span><b>28 662</b> triangles</span>
+    <span><b>58</b> studs de long</span>
+    <span><b>9</b> parties</span>
+  </div>
+</header>
+
+<div class="hint">Glisser pour tourner · molette ou pincer pour zoomer</div>
+
+<div id="status">Chargement du dragon…</div>
+
+<nav class="controls" aria-label="Commandes de la démo">
+  <div class="group">
+    <button id="btn-fly" aria-pressed="true">Vol</button>
+    <button id="btn-spin" aria-pressed="false">Rotation</button>
+  </div>
+  <div class="sep" aria-hidden="true"></div>
+  <div class="group" role="group" aria-label="Vues">
+    <button data-view="trois">Trois-quarts</button>
+    <button data-view="profil">Profil</button>
+    <button data-view="face">Face</button>
+    <button data-view="tete">Tête</button>
+  </div>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function () {
+  const stage = document.getElementById("stage");
+  const status = document.getElementById("status");
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  stage.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x120f12, 90, 190);
+  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 500);
+
+  // Lumière : ciel chaud / sol sombre, une lumière principale dorée et un contre-jour jade.
+  scene.add(new THREE.HemisphereLight(0xfff1dc, 0x241a1c, 0.75));
+  const key = new THREE.DirectionalLight(0xffe2b0, 1.5);
+  key.position.set(30, 45, 40);
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0x5fd1a8, 0.7);
+  rim.position.set(-35, 20, -40);
+  scene.add(rim);
+
+  // Socle : disque discret avec un halo, pour poser le dragon dans l'espace.
+  const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(40, 64),
+    new THREE.MeshBasicMaterial({ color: 0x0c0a0c, transparent: true, opacity: 0.6 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -1.5;
+  scene.add(ground);
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(39.4, 40, 96),
+    new THREE.MeshBasicMaterial({ color: 0xe8b84f, transparent: true, opacity: 0.25 })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = -1.48;
+  scene.add(ring);
+
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.minDistance = 8;
+  controls.maxDistance = 140;
+  controls.maxPolarAngle = Math.PI * 0.62;
+
+  const pivot = new THREE.Group();
+  scene.add(pivot);
+
+  // Ondulation du vol : le corps ondule de plus en plus vers la queue, la tête reste presque stable.
+  const shared = { uTime: { value: 0 }, uFly: { value: reduceMotion ? 0 : 1 } };
+  function addWave(material) {
+    material.flatShading = true;
+    material.onBeforeCompile = function (shader) {
+      shader.uniforms.uTime = shared.uTime;
+      shader.uniforms.uFly = shared.uFly;
+      shader.vertexShader = "uniform float uTime;\nuniform float uFly;\n" + shader.vertexShader.replace(
+        "#include <begin_vertex>",
+        [
+          "vec3 transformed = vec3(position);",
+          "float w = clamp((26.0 - position.z) / 55.0, 0.0, 1.0);",
+          "w = w * w * (3.0 - 2.0 * w);",
+          "transformed.x += sin(position.z * 0.17 - uTime * 2.2) * 2.2 * w * uFly;",
+          "transformed.y += cos(position.z * 0.11 - uTime * 1.6) * 1.1 * w * uFly;"
+        ].join("\n")
+      );
+    };
+    material.needsUpdate = true;
+  }
+
+  const views = {
+    trois: { pos: [52, 26, 46], target: [0, 8, 0] },
+    profil: { pos: [78, 12, 0], target: [0, 8, 0] },
+    face: { pos: [0, 14, 70], target: [0, 9, 10] },
+    tete: { pos: [16, 16, 46], target: [0, 13, 24] }
+  };
+  let tween = null;
+  function goTo(name, instant) {
+    const v = views[name];
+    const to = { pos: new THREE.Vector3().fromArray(v.pos), target: new THREE.Vector3().fromArray(v.target) };
+    if (instant || reduceMotion) {
+      camera.position.copy(to.pos);
+      controls.target.copy(to.target);
+      controls.update();
+      return;
+    }
+    tween = { from: { pos: camera.position.clone(), target: controls.target.clone() }, to: to, t: 0 };
+  }
+
+  function resize() {
+    const w = stage.clientWidth, h = stage.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.fov = w < 600 ? 50 : 38;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener("resize", resize);
+  resize();
+  goTo("trois", true);
+
+  // Le modèle est joint à la page encodé en base64 (dragon_v18.txt) : on le décode puis on le lit comme un .glb.
+  function onModel(gltf) {
+    const model = gltf.scene;
+    model.traverse(function (o) {
+      if (o.isMesh) {
+        const m = o.material;
+        // Les couleurs du fichier sont en sRGB (comme dans Roblox) : on les passe en linéaire pour le rendu.
+        m.color.convertSRGBToLinear();
+        if (m.emissive) m.emissive.convertSRGBToLinear();
+        if (o.name.indexOf("Eyes") === 0 || (m.emissive && m.emissive.getHex() !== 0)) m.emissiveIntensity = 1.6;
+        if (o.name.indexOf("Fins") === 0 || o.name.indexOf("Whiskers") === 0) m.side = THREE.DoubleSide;
+        addWave(m);
+      }
+    });
+    pivot.add(model);
+    status.hidden = true;
+  }
+  function onError() {
+    status.textContent = "Le modèle n'a pas pu être chargé. Recharge la page pour réessayer.";
+  }
+  fetch("dragon_v18.txt")
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+    .then(function (b64) {
+      const bin = atob(b64.trim());
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      new THREE.GLTFLoader().parse(bytes.buffer, "", onModel, onError);
+    })
+    .catch(onError);
+
+  // Commandes
+  const btnFly = document.getElementById("btn-fly");
+  const btnSpin = document.getElementById("btn-spin");
+  let fly = !reduceMotion, spin = false;
+  btnFly.setAttribute("aria-pressed", String(fly));
+  btnFly.addEventListener("click", function () {
+    fly = !fly;
+    btnFly.setAttribute("aria-pressed", String(fly));
+  });
+  btnSpin.addEventListener("click", function () {
+    spin = !spin;
+    btnSpin.setAttribute("aria-pressed", String(spin));
+  });
+  document.querySelectorAll("[data-view]").forEach(function (b) {
+    b.addEventListener("click", function () { goTo(b.dataset.view); });
+  });
+  controls.addEventListener("start", function () { tween = null; });
+
+  const clock = new THREE.Clock();
+  let flyAmount = shared.uFly.value;
+  function loop() {
+    const dt = Math.min(clock.getDelta(), 0.05);
+    shared.uTime.value += dt;
+    flyAmount += ((fly ? 1 : 0) - flyAmount) * Math.min(1, dt * 3);
+    shared.uFly.value = flyAmount;
+    pivot.position.y = Math.sin(shared.uTime.value * 1.1) * 0.8 * flyAmount;
+    if (spin) pivot.rotation.y += dt * 0.25;
+    if (tween) {
+      tween.t = Math.min(1, tween.t + dt / 1.1);
+      const e = tween.t < 0.5 ? 4 * tween.t * tween.t * tween.t : 1 - Math.pow(-2 * tween.t + 2, 3) / 2;
+      camera.position.lerpVectors(tween.from.pos, tween.to.pos, e);
+      controls.target.lerpVectors(tween.from.target, tween.to.target, e);
+      if (tween.t >= 1) tween = null;
+    }
+    controls.update();
+    renderer.render(scene, camera);
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+</script>
