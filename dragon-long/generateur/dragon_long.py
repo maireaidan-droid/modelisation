@@ -1,6 +1,7 @@
 # Dragon Long (dragon chinois) stylisé, low-poly.
 # v1 : premier croquis. v2 : écailles en relief sur le dos, plaques sur le ventre, crête plus fournie, yeux retravaillés.
 # v3 : tête plus grande et sculptée (nez de félin, sourcils dorés en volutes, barbichette, joues, rides du museau).
+# v4 : nez fondu dans le crâne (truffe, coussinets et sillon sculptés dans la même peau), yeux enfoncés dans des orbites.
 # Corps de serpent en S, ventre doré, crinière et nageoires rouges, cornes en bois de cerf,
 # moustaches, 4 pattes à 3 griffes. Repère Roblox : Y en haut, 1 unité = 1 stud, la tête regarde vers +Z.
 import numpy as np
@@ -177,7 +178,8 @@ def build_legs(a, pts, T, N, B, radii):
 
 def build_eye(a, P, f, u, side_v, S):
     sd = 1 if side_v @ np.cross(u, f) > 0 else -1
-    c = P(1.5, 0.5, 1.52 * sd)
+    ex, ey = EYE
+    c = P(ex, ey, (skull_side(ex, ey) + 0.02) * sd)              # posé au fond de l'orbite
     out = normalize(side_v + f * 0.45 + u * 0.1)              # l'œil regarde un peu vers l'avant
     e1 = normalize(f - out * (f @ out) - u * 0.22)            # grand axe, coin arrière relevé
     e2 = normalize(np.cross(out, e1))
@@ -216,26 +218,83 @@ SKULL = [
     (1.2, 0.42, 1.68, 1.45, 1.25),
     (1.9, 0.25, 1.42, 1.12, 1.12),
     (2.6, 0.08, 1.22, 0.95, 0.95),
-    (3.3, 0.02, 1.18, 0.88, 0.85),
-    (3.9, 0.0, 1.22, 0.85, 0.8),
-    (4.35, -0.05, 1.0, 0.72, 0.68),
-    (4.62, -0.1, 0.6, 0.48, 0.42),
+    (3.3, 0.02, 1.15, 0.88, 0.85),
+    (3.9, -0.02, 1.1, 0.84, 0.8),
+    (4.3, -0.05, 0.98, 0.76, 0.72),
+    (4.55, -0.07, 0.78, 0.64, 0.58),
+    (4.72, -0.08, 0.5, 0.44, 0.38),
 ]
 SUPER = 2.6   # > 2 : section plus carrée, joues pleines
+EYE = (1.5, 0.5)  # centre de l'œil (x, y) dans le repère de la tête
+
+
+def gauss(v):
+    return np.exp(-v * v)
+
+
+def smoothstep(a, b, x):
+    t = np.clip((x - a) / (b - a), 0, 1)
+    return t * t * (3 - 2 * t)
+
+
+def relief(x, y, side_w, top_w=0.0):
+    """Bosses et creux sculptés dans la peau du crâne (en studs, vers l'extérieur).
+    side_w : 1 sur le côté de la tête, 0 dessus/dessous (les orbites ne creusent que les côtés).
+    top_w : 1 sur le dessus (arête du nez)."""
+    ex, ey = EYE
+    d = 0.0
+    # Orbite : creux en amande autour de l'œil, et arcade sourcilière en bourrelet au-dessus.
+    d -= 0.38 * gauss(np.hypot((x - ex) / 0.62, (y - ey) / 0.42)) * side_w
+    d += 0.22 * gauss(np.hypot((x - ex - 0.1) / 0.8, (y - ey - 0.58) / 0.2)) * side_w
+    # Pommette sous l'orbite, qui file vers l'arrière.
+    d += 0.1 * gauss(np.hypot((x - ex + 0.4) / 0.9, (y - ey + 0.62) / 0.22)) * side_w
+    # Coussinets des moustaches, gonflés de chaque côté du museau (comme un tigre).
+    d += 0.3 * gauss(np.hypot((x - 4.05) / 0.5, (y + 0.3) / 0.36)) * side_w
+    # Arête du nez : léger creux, puis la truffe qui se relève au bout.
+    d -= 0.07 * gauss((x - 4.0) / 0.22) * top_w
+    d += 0.12 * gauss((x - 4.5) / 0.22) * top_w
+    return d
+
+
+def skull_section(x):
+    xs = [r[0] for r in SKULL]
+    return [np.interp(x, xs, [r[k] for r in SKULL]) for k in (1, 2, 3, 4)]
+
+
+def skull_point(x, t):
+    """Point de la peau du crâne à l'avant-arrière x et à l'angle t (0 = côté gauche, pi/2 = dessus).
+    Tout le museau (truffe, coussinets, sillon) est sculpté ici, d'un seul tenant avec le crâne."""
+    yc, w, ht, hb = skull_section(x)
+    ct, st = np.cos(t), np.sin(t)
+    h = ht if st >= 0 else hb
+    z = w * np.sign(ct) * abs(ct) ** (2 / SUPER)
+    y = h * np.sign(st) * abs(st) ** (2 / SUPER)
+    # Normale de la super-ellipse, pour pousser les bosses vers l'extérieur.
+    nz = np.sign(z) * abs(z / w) ** (SUPER - 1) / w
+    ny = np.sign(y) * abs(y / h) ** (SUPER - 1) / h
+    nn = np.hypot(nz, ny) or 1.0
+    nz, ny = nz / nn, ny / nn
+    d = relief(x, yc + y, abs(nz) ** 1.5, max(0.0, ny) ** 2)
+    # Avant du museau : la truffe déborde en haut, les coussinets avancent, le sillon recule au milieu.
+    front = smoothstep(4.0, 4.72, x)
+    dx = 0.3 * front * max(0.0, st) ** 1.3
+    dx += 0.14 * front * np.clip(-st * abs(ct) * 2.2, 0, 1)
+    dx -= 0.18 * front * gauss(ct / 0.22) * max(0.0, -st)
+    return np.array([x + dx, yc + y + ny * d, z + nz * d])
 
 
 def skull_side(x, y):
-    """Demi-largeur du crâne à l'avant-arrière x et à la hauteur y (pour poser des détails sur la peau)."""
-    xs = [r[0] for r in SKULL]
-    yc, w, ht, hb = (np.interp(x, xs, [r[k] for r in SKULL]) for k in (1, 2, 3, 4))
+    """Demi-largeur du crâne (relief compris) à l'avant-arrière x et à la hauteur y."""
+    yc, w, ht, hb = skull_section(x)
     h = ht if y >= yc else hb
     v = min(abs(y - yc) / h, 0.999)
-    return w * (1 - v ** SUPER) ** (1 / SUPER)
+    z = w * (1 - v ** SUPER) ** (1 / SUPER)
+    return z + relief(x, y, (1 - v) ** 0.5)
 
 
 def skull_top(x):
-    xs = [r[0] for r in SKULL]
-    return np.interp(x, xs, [r[1] + r[3] for r in SKULL])
+    yc, w, ht, hb = skull_section(x)
+    return yc + ht
 
 
 def build_head(a, neck, neck_r):
@@ -253,32 +312,19 @@ def build_head(a, neck, neck_r):
     def on_skin(x, y, side, lift=0.04):
         return P(x, y, side * (skull_side(x, y) + lift))
 
-    def ring(x, yc, w, ht, hb, n=14):
-        out = []
-        for t in np.pi / n + np.arange(n) * 2 * np.pi / n:
-            ct, st = np.cos(t), np.sin(t)
-            z = w * np.sign(ct) * abs(ct) ** (2 / SUPER)
-            y = (ht if st >= 0 else hb) * np.sign(st) * abs(st) ** (2 / SUPER)
-            out.append(P(x, yc + y, z))
-        return np.array(out)
+    # Crâne + museau d'un seul tenant (truffe, coussinets, sillon et orbites sculptés dans la même peau).
+    xs = np.concatenate([np.linspace(-1.4, 0.6, 5), np.linspace(0.85, 2.3, 8), np.linspace(2.6, 3.8, 4),
+                         np.linspace(3.95, 4.72, 7)])
+    angs = np.pi / 24 + np.arange(24) * 2 * np.pi / 24
+    a.add("Body", *loft([np.array([P(*skull_point(x, t)) for t in angs]) for x in xs]))
 
-    # Crâne + museau.
-    a.add("Body", *loft([ring(*r) for r in SKULL]))
+    # Narines en virgule, creusées dans le haut de la truffe.
+    for side in (1, -1):
+        rim = skull_point(4.72, np.pi / 2 - side * 0.9)
+        n0 = P(*(rim * 0.72 + np.array([4.86, 0.05, 0.0]) * 0.28))
+        a.add("Pupils", *gem(n0, normalize(f * 0.9 + s * side * 0.3), u, normalize(s * side - f * 0.3),
+                             0.09 * S, 0.12 * S, 0.2 * S))
 
-    # Nez de félin : truffe en triangle à l'avant du museau, 2 narines, ailes du nez enroulées.
-    tri = [(-0.55, 0.62), (0.0, 0.7), (0.55, 0.62), (0.32, 0.28), (0.0, 0.06), (-0.32, 0.28)]
-    a.add("Body", *loft([np.array([P(4.15, y + 0.02, z * 1.1) for z, y in tri]),
-                         np.array([P(4.6, y, z) for z, y in tri]),
-                         np.array([P(4.82, y * 0.9 + 0.04, z * 0.82) for z, y in tri])]))
-    for side in (1, -1):
-        a.add("Pupils", *gem(P(4.8, 0.36, 0.27 * side), f, u, s, 0.1 * S, 0.1 * S, 0.15 * S))
-        wing = [P(4.55 + 0.25 * np.cos(t) * 0.6, 0.38 + 0.26 * np.sin(t), (0.3 + 0.26 * np.cos(t)) * side)
-                for t in np.linspace(np.radians(110), np.radians(-130), 7)]
-        a.add("Body", *tube(wing, [0.04, 0.09, 0.11, 0.11, 0.1, 0.07, 0.0], 5))
-    # Sillon sous la truffe vers la lèvre, et coussinets des moustaches (comme un tigre).
-    a.add("Body", *tube([P(4.7, 0.08, 0), P(4.62, -0.2, 0), P(4.5, -0.42, 0)], [0.09, 0.08, 0.06], 5, tip=False))
-    for side in (1, -1):
-        a.add("Body", *blob(P(4.05, -0.32, 0.6 * side), f, u, s, 0.62 * S, 0.45 * S, 0.55 * S))
     # Rides du chanfrein (le « grognement » des félins) : 3 bourrelets en arc sur le museau.
     for x in (2.55, 2.95, 3.35):
         arc = [P(x + 0.06 * abs(np.cos(t)), skull_top(x) * np.sin(t) * 0.97 + 0.02 * (1 - np.sin(t)),
@@ -413,7 +459,7 @@ def build_head(a, neck, neck_r):
 
 
 def build():
-    a = Asset("Dragon_Long_v3")
+    a = Asset("Dragon_Long_v4")
     for name, (color, mat) in COULEURS.items():
         a.part(name, color, mat)
     pts = catmull_rom(SPINE, RINGS)
