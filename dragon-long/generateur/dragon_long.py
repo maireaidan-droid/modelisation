@@ -144,7 +144,38 @@ def build_belly_plates(a, pts, T, N, B, radii):
         a.add("Belly", *loft(sections))
 
 
+def crystal(a, base, d, L, r, part="Fins"):
+    """Cristal hexagonal pointu, planté un peu dans la peau."""
+    d = normalize(d)
+    a.add(part, *tube([base - d * r * 0.6, base + d * L * 0.72, base + d * L], [r * 0.9, r, 0.0], 6))
+
+
+def build_crystal_crest(a, pts, T, N, B, radii):
+    # Crête du dos en cristaux : un grand cristal couché vers la queue, parfois accompagné d'un petit.
+    sizes = (1.0, 0.7, 0.85, 0.65)
+    for j, i in enumerate(range(5, RINGS - 6, 3)):
+        r = radii[i]
+        base = pts[i] + N[i] * r * 0.8
+        lean = B[i] * (0.18 if j % 2 else -0.18)
+        L = (1.7 + 0.9 * r) * sizes[j % 4]
+        crystal(a, base, N[i] + T[i] * 0.45 + lean, L, 0.26 + 0.12 * r)
+        if j % 2 == 0:
+            crystal(a, base + B[i] * 0.3 * r + T[i] * 0.3, N[i] + T[i] * 0.3 - lean * 2.5, L * 0.6, 0.16 + 0.07 * r)
+    # Petits cristaux sur les côtés de la queue.
+    for i in range(int(RINGS * 0.58), RINGS - 5, 6):
+        for sd in (1, -1):
+            r = radii[i]
+            crystal(a, pts[i] + B[i] * sd * r * 0.75, B[i] * sd + T[i] * 0.7 + N[i] * 0.2, 0.9 + 0.6 * r, 0.14 + 0.06 * r)
+    # Bout de la queue : une gerbe de 5 cristaux.
+    end, t_end, n_end, b_end = pts[-1], T[-1], N[-1], B[-1]
+    for k, ang in enumerate(np.linspace(-0.8, 0.8, 5)):
+        d = t_end * np.cos(ang) + n_end * np.sin(ang) + b_end * (0.15 if k % 2 else -0.15)
+        crystal(a, end - t_end * 0.4, d, 3.4 - abs(ang) * 1.0, 0.4 - abs(ang) * 0.09)
+
+
 def build_spines(a, pts, T, N, B, radii):
+    if getattr(a, "style", {}).get("crest") == "cristaux":
+        return build_crystal_crest(a, pts, T, N, B, radii)
     # Crête du dos : mèches de flammes qui se suivent, couchées vers la queue, grandes / petites en alternance,
     # penchées un peu à gauche puis à droite (même style que la crinière).
     sizes = (1.0, 0.7, 0.85, 0.65)
@@ -954,13 +985,28 @@ def build_head(a, neck, neck_r):
         a.add("Horns", *tube(line, radii, sides))
         return line
 
+    horns = getattr(a, "style", {}).get("horns", "bois")
     for side in (1, -1):
-        main = ridged([P(-0.1, 1.45, 0.7 * side), P(-0.9, 2.45, 0.95 * side), P(-2.0, 3.25, 1.25 * side),
-                       P(-3.2, 3.6, 1.45 * side), P(-4.2, 3.72, 1.55 * side), P(-4.9, 4.05, 1.5 * side)], 0.44, 16)
-        for idx, (up_l, back_l, r) in ((5, (1.05, 0.35, 0.19)), (10, (0.8, 0.3, 0.15))):
+        if horns == "couronne":
+            # Couronne : 3 cornes droites par côté, en éventail, qui montent vers l'arrière.
+            for x0, y0, z0, L, up_k, out_k, r in ((0.3, 1.6, 0.45, 2.0, 1.0, 0.15, 0.3), (-0.3, 1.55, 0.75, 2.8, 0.85, 0.3, 0.38),
+                                                   (-0.9, 1.3, 0.95, 2.2, 0.6, 0.5, 0.32)):
+                b0 = P(x0, y0, z0 * side)
+                d = normalize(u * up_k - f * 0.6 + s * side * out_k)
+                ridged([b0, b0 + d * L * 0.5 * S, b0 + d * L * S + u * 0.15 * S], r, 10, ring=2.0)
+            continue
+        k = 1.3 if horns == "grands_bois" else 1.0
+        base = P(-0.1, 1.45, 0.7 * side)
+        path = [P(-0.1, 1.45, 0.7 * side), P(-0.9, 2.45, 0.95 * side), P(-2.0, 3.25, 1.25 * side),
+                P(-3.2, 3.6, 1.45 * side), P(-4.2, 3.72, 1.55 * side), P(-4.9, 4.05, 1.5 * side)]
+        main = ridged([base + (q - base) * k for q in path], 0.44 * (1.12 if k > 1 else 1.0), 16)
+        branches = ((5, (1.05, 0.35, 0.19)), (10, (0.8, 0.3, 0.15)))
+        if horns == "grands_bois":
+            branches = ((3, (0.9, 0.2, 0.2)), (7, (1.35, 0.4, 0.21)), (11, (1.0, 0.35, 0.17)))
+        for idx, (up_l, back_l, r) in branches:
             b0 = main[idx]
-            ridged([b0, b0 + (u * up_l * 0.5 - f * back_l * 0.2 + s * side * 0.05) * S,
-                    b0 + (u * up_l - f * back_l + s * side * 0.08) * S], r, 7, ring=2.0, sides=6)
+            ridged([b0, b0 + (u * up_l * 0.5 - f * back_l * 0.2 + s * side * 0.05) * S * k,
+                    b0 + (u * up_l - f * back_l + s * side * 0.08) * S * k], r, 7, ring=2.0, sides=6)
         # Oreilles en nageoire.
         a.add("Fins", *fin(P(-0.4, 0.9, 1.45 * side), P(-1.2, 0.6, 1.2 * side), P(-2.3, 1.5, 2.4 * side),
                            normalize(u - s * side * 0.5), 0.12))
@@ -1008,8 +1054,17 @@ def build_head(a, neck, neck_r):
 SPINE_BONES = [(0, "Head"), (5, "Neck"), (10, "Neck2"), (14, "Root")] + [(18 + 4 * k, "S%02d" % (k + 1)) for k in range(14)]
 
 
-def build():
-    a = Asset("Dragon_Long_v19")
+# Variantes de forme (même squelette, donc mêmes animations).
+VARIANTS = {
+    "": {},                                                   # forme de base : bois de cerf, crête en flammes
+    "glace": {"horns": "couronne", "crest": "cristaux"},      # Épique
+    "celeste": {"horns": "grands_bois", "crest": "cristaux"},  # Légendaire
+}
+
+
+def build(variant=""):
+    a = Asset("Dragon_Long_v19" + ("_" + variant if variant else ""))
+    a.style = VARIANTS[variant]
     for name, (color, mat) in COULEURS.items():
         a.part(name, color, mat)
     pts = catmull_rom(SPINE, RINGS)

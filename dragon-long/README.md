@@ -52,6 +52,19 @@ Pour le faire avec une session Claude locale connectée à Studio : coller [PROM
 **Avatar → Import 3D**, unité **Stud**, parties séparées. Le pivot est sous le dragon (Y = 0) et la tête regarde vers +Z.
 Pour les nageoires, mettre `DoubleSided = true` si elles disparaissent sous certains angles.
 
+## Raretés (démo)
+[Démo des raretés](https://claude.ai/artifact/VY6CPq3po41ogJsHf811o3) — page `demo/raretes.html`.
+
+| Rareté | Nom | Ce qui change | Modèle |
+|---|---|---|---|
+| Commun | Dragon de Jade | palette de base | `objets/Dragon_Long_v19_rig.glb` |
+| Rare | Dragon de Braise | palette feu, crinière et crête lumineuses | même modèle |
+| Épique | Dragon de Glace | crête et queue en cristaux, cornes en couronne, palette glacée | `objets/Dragon_Long_v19_glace_rig.glb` |
+| Légendaire | Dragon Céleste | grands bois à 3 branches, cristaux, palette nacre et or lumineuse, aura d'étincelles | `objets/Dragon_Long_v19_celeste_rig.glb` |
+
+Les formes spéciales viennent du même générateur (`python build_rig.py glace` / `celeste`) avec le même squelette :
+toutes les animations marchent pour toutes les raretés. Les palettes sont dans `demo/raretes.html`.
+
 ## Animation
 - `generateur/build_rig.py` exporte `objets/Dragon_Long_v19_rig.glb` (même géométrie, plus le squelette et les poids de peau) et `objets/Dragon_Long_v19_rig.json` (liste des os).
 - `roblox/DragonAnimator.client.lua` (LocalScript, StarterPlayerScripts) anime les os ; l'attribut `Mode` du Model choisit `Idle`, `Walk` ou `Fly`.

@@ -1,6 +1,6 @@
 # Exporte le dragon AVEC son squelette (os + poids de peau) en .glb, pour l'animer dans Roblox.
 # Même géométrie et mêmes couleurs que le modèle statique ; chaque sommet suit 1 à 4 os.
-# Usage : python build_rig.py
+# Usage : python build_rig.py [variante]   (variantes : glace, celeste ; rien = forme de base)
 import json
 import os
 import struct
@@ -139,8 +139,8 @@ class GLB:
         return len(self.accessors) - 1
 
 
-def main():
-    a = build()
+def main(variant=""):
+    a = build(variant)
     name = a.name + "_rig"
     # Même pivot que le modèle statique : posé à Y = 0, centré sur X/Z.
     mn, mx = a.bounds()
@@ -248,4 +248,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    main(sys.argv[1] if len(sys.argv) > 1 else "")

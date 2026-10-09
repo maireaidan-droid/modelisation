@@ -1,0 +1,434 @@
+<title>Raretés du Dragon Long</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap">
+<style>
+/* Plein écran : la scène 3D au fond, le nom de la rareté en haut à gauche, les 4 cartes de rareté en bas.
+   Un seul univers sombre (vitrine nocturne) ; la couleur d'accent change avec la rareté choisie. */
+:root {
+  color-scheme: dark;
+  --bg: #100d10;
+  --ink: #f3ece2;
+  --muted: #b3a89c;
+  --panel: rgba(22, 18, 21, 0.82);
+  --line: rgba(243, 236, 226, 0.16);
+  --accent: #9aa3a8;
+  --glow: rgba(154, 163, 168, 0.25);
+  --display: "Cinzel", "Trajan Pro", Georgia, serif;
+  --body: "Nunito Sans", "Segoe UI", system-ui, sans-serif;
+}
+html, body { height: 100%; }
+body {
+  background: radial-gradient(110% 85% at 50% 38%, var(--glow), var(--bg) 68%);
+  color: var(--ink);
+  font-family: var(--body);
+  overflow: hidden;
+  transition: background 0.6s;
+}
+#stage { position: fixed; inset: 0; }
+#stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+.title {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  left: 16px;
+  max-width: min(460px, calc(100% - 32px));
+  display: grid;
+  gap: 6px;
+  pointer-events: none;
+}
+.badge {
+  justify-self: start;
+  font: 800 11px/1 var(--body);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #120f12;
+  background: var(--accent);
+  border-radius: 999px;
+  padding: 6px 10px;
+}
+.title h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(26px, 5vw, 42px);
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  text-wrap: balance;
+  transition: color 0.4s;
+}
+.title p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.45; }
+
+.modes {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  right: 16px;
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+.modes button {
+  font: 700 12px/1 var(--body);
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.modes button[aria-pressed="true"] { background: var(--accent); color: #120f12; }
+.modes button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.cards {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  max-width: 980px;
+  margin-inline: auto;
+}
+.card {
+  --c: #9aa3a8;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  text-align: left;
+  min-width: 0;
+  font-family: var(--body);
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--c);
+  border-radius: 12px;
+  padding: 12px 12px 14px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+.card:hover { transform: translateY(-2px); }
+.card[aria-pressed="true"] { border-color: var(--c); box-shadow: 0 0 0 1px var(--c), 0 8px 28px -10px var(--c); }
+.card .rar { font: 800 11px/1 var(--body); letter-spacing: 0.14em; text-transform: uppercase; color: var(--c); }
+.card .name { font: 700 17px/1.15 var(--display); letter-spacing: 0.04em; }
+.swatches { display: flex; gap: 4px; }
+.swatches span { width: 16px; height: 16px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.18); }
+.card ul { margin: 2px 0 0; padding-left: 16px; color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+
+#status {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  pointer-events: none;
+  text-align: center;
+  padding-inline: 16px;
+}
+#status[hidden] { display: none; }
+
+@media (max-width: 760px) {
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card ul { display: none; }
+  .title p { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { body, .card { transition: none; } }
+</style>
+
+<div id="stage"></div>
+
+<header class="title">
+  <span class="badge" id="badge">Commun</span>
+  <h1 id="name">Dragon de Jade</h1>
+  <p id="desc">Le dragon de base : palette jade, or et rouge.</p>
+</header>
+
+<div class="modes" role="group" aria-label="Animation">
+  <button data-mode="Idle" aria-pressed="true">Repos</button>
+  <button data-mode="Walk" aria-pressed="false">Marche</button>
+  <button data-mode="Fly" aria-pressed="false">Vol</button>
+</div>
+
+<div id="status">Chargement du dragon…</div>
+
+<nav class="cards" id="cards" aria-label="Raretés"></nav>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="animator.js"></script>
+<script>
+(function () {
+  // Les 4 raretés : palette (couleur de chaque partie, en sRGB comme dans Roblox), lueur (0 = aucune),
+  // forme (fichier du modèle) et particules.
+  const RARITIES = [
+    { id: "commun", rarity: "Commun", color: "#9aa3a8", name: "Dragon de Jade", file: "dragon_v19_rig.txt",
+      desc: "Le dragon de base : palette jade, or et rouge.",
+      points: ["Palette simple", "Forme de base"],
+      parts: { Body: "#2F7D63", Belly: "#E2B65C", Fins: "#C8432F", Horns: "#E6DCC3", Whiskers: "#F0C24B",
+               Eyes: "#FFD23F", Pupils: "#17120E", Mouth: "#8E2529", Tongue: "#B9434C" },
+      glow: {} },
+    { id: "rare", rarity: "Rare", color: "#4c8dff", name: "Dragon de Braise", file: "dragon_v19_rig.txt",
+      desc: "Écailles couleur de lave refroidie ; sa crinière et sa crête rougeoient comme des braises.",
+      points: ["Palette feu", "Crinière et crête lumineuses"],
+      parts: { Body: "#6E1D1A", Belly: "#E8A33D", Fins: "#FF6A1A", Horns: "#2A2020", Whiskers: "#FFB12E",
+               Eyes: "#FFE14A", Pupils: "#1A0A05", Mouth: "#7A1515", Tongue: "#C2453F" },
+      glow: { Fins: 0.55, Whiskers: 0.3 } },
+    { id: "epique", rarity: "Épique", color: "#a55bff", name: "Dragon de Glace", file: "dragon_v19_glace_rig.txt",
+      desc: "Une crête et une queue de cristaux, une couronne de cornes : sa forme change, pas seulement ses couleurs.",
+      points: ["Forme spéciale : cristaux", "Cornes en couronne", "Palette glacée qui luit"],
+      parts: { Body: "#4A82AE", Belly: "#DCEEF6", Fins: "#6FE6FF", Horns: "#E3EEF5", Whiskers: "#C8F4FF",
+               Eyes: "#7FE3FF", Pupils: "#0E2233", Mouth: "#5B2A4A", Tongue: "#B85A7A" },
+      glow: { Fins: 0.45, Whiskers: 0.2 } },
+    { id: "legendaire", rarity: "Légendaire", color: "#ffb938", name: "Dragon Céleste", file: "dragon_v19_celeste_rig.txt",
+      desc: "Nacre et or, de grands bois à trois branches, des cristaux de lumière et une aura d'étincelles dorées.",
+      points: ["Forme unique : grands bois", "Palette nacre et or lumineuse", "Aura de particules"],
+      parts: { Body: "#E3D8C4", Belly: "#D9A93F", Fins: "#FFD24D", Horns: "#E8B84F", Whiskers: "#FFF0A8",
+               Eyes: "#7FF7FF", Pupils: "#1B1406", Mouth: "#8E2529", Tongue: "#C25A5A" },
+      glow: { Fins: 0.8, Whiskers: 0.45, Horns: 0.15 }, sparkles: true }
+  ];
+
+  const stage = document.getElementById("stage");
+  const status = document.getElementById("status");
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  stage.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 500);
+  scene.add(new THREE.HemisphereLight(0xfff1dc, 0x241a1c, 0.75));
+  const key = new THREE.DirectionalLight(0xffe2b0, 1.5);
+  key.position.set(30, 45, 40);
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0x9fd8ff, 0.6);
+  rim.position.set(-35, 20, -40);
+  scene.add(rim);
+
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.minDistance = 10;
+  controls.maxDistance = 140;
+  controls.target.set(0, 9, 0);
+  camera.position.set(52, 24, 50);
+
+  const pivot = new THREE.Group();
+  scene.add(pivot);
+
+  function resize() {
+    const w = stage.clientWidth, h = stage.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.fov = w < 600 ? 52 : 38;
+    camera.updateProjectionMatrix();
+    sparkMat.uniforms.uScale.value = h * 0.03;     // taille des étincelles en pixels, suivant la hauteur de l'écran
+  }
+  window.addEventListener("resize", resize);
+
+  // ---------- Modèles : un par forme, chargés à la demande et gardés en mémoire ----------
+  const models = {};   // fichier -> { scene, meshes, bones, anim }
+  const euler = new THREE.Euler(), quat = new THREE.Quaternion(), off = new THREE.Vector3();
+
+  function loadModel(file) {
+    if (models[file]) return models[file].promise;
+    const entry = {};
+    models[file] = entry;
+    entry.promise = fetch(file)
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function (b64) {
+        const bin = atob(b64.trim());
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return new Promise(function (res, rej) { new THREE.GLTFLoader().parse(bytes.buffer, "", res, rej); });
+      })
+      .then(function (gltf) {
+        const meshes = {}, bones = {}, rest = {};
+        gltf.scene.traverse(function (o) {
+          if (o.isMesh) {
+            const part = o.name.replace(/[_\d]+$/, "");
+            o.material = o.material.clone();
+            o.material.flatShading = true;
+            if (part === "Fins" || part === "Whiskers") o.material.side = THREE.DoubleSide;
+            o.frustumCulled = false;
+            (meshes[part] = meshes[part] || []).push(o);
+          }
+          if (o.isBone) {
+            bones[o.name] = o;
+            rest[o.name] = { q: o.quaternion.clone(), p: o.position.clone() };
+          }
+        });
+        entry.scene = gltf.scene;
+        entry.meshes = meshes;
+        entry.bones = bones;
+        entry.anim = DragonAnimator.create(bones, function (name, rx, ry, rz, ty, tz, tx) {
+          const b = bones[name];
+          if (!b) return;
+          euler.set(rx, ry, rz, "XYZ");
+          b.quaternion.copy(rest[name].q).multiply(quat.setFromEuler(euler));
+          off.set(tx || 0, ty || 0, tz || 0).applyQuaternion(rest[name].q);
+          b.position.copy(rest[name].p).add(off);
+        });
+        return entry;
+      });
+    return entry.promise;
+  }
+
+  function applyPalette(entry, r) {
+    for (const part in entry.meshes) {
+      const hex = r.parts[part];
+      if (!hex) continue;
+      entry.meshes[part].forEach(function (o) {
+        const m = o.material;
+        m.color.set(hex).convertSRGBToLinear();
+        const g = part === "Eyes" ? 1.6 : (r.glow[part] || 0);
+        m.emissive.set(hex).convertSRGBToLinear();
+        m.emissiveIntensity = g;
+      });
+    }
+  }
+
+  // ---------- Aura d'étincelles (Légendaire) : naissent le long du corps, montent et s'éteignent ----------
+  const SPARKS = 260;
+  const sparkGeo = new THREE.BufferGeometry();
+  const sparkPos = new Float32Array(SPARKS * 3), sparkAlpha = new Float32Array(SPARKS);
+  const sparkVel = new Float32Array(SPARKS * 3), sparkLife = new Float32Array(SPARKS);
+  sparkGeo.setAttribute("position", new THREE.BufferAttribute(sparkPos, 3));
+  sparkGeo.setAttribute("alpha", new THREE.BufferAttribute(sparkAlpha, 1));
+  const sparkMat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    uniforms: { uColor: { value: new THREE.Color(0xffd36b) }, uScale: { value: 1 } },
+    vertexShader: "attribute float alpha; varying float vA; uniform float uScale;" +
+      "void main(){ vA = alpha; vec4 mv = modelViewMatrix * vec4(position,1.0);" +
+      "gl_PointSize = uScale * 26.0 / -mv.z; gl_Position = projectionMatrix * mv; }",
+    fragmentShader: "uniform vec3 uColor; varying float vA;" +
+      "void main(){ vec2 d = gl_PointCoord - 0.5; float r = length(d);" +
+      "float a = smoothstep(0.5, 0.0, r) * vA; gl_FragColor = vec4(uColor * (1.0 + 1.5 * smoothstep(0.2,0.0,r)), a); }"
+  });
+  const sparks = new THREE.Points(sparkGeo, sparkMat);
+  sparks.frustumCulled = false;
+  sparks.visible = false;
+  scene.add(sparks);
+  resize();
+  const SPINE_NAMES = ["Head", "Neck", "Neck2", "Root"];
+  for (let k = 1; k <= 14; k++) SPINE_NAMES.push("S" + String(k).padStart(2, "0"));
+  const tmp = new THREE.Vector3();
+
+  function updateSparks(dt, entry) {
+    for (let i = 0; i < SPARKS; i++) {
+      sparkLife[i] -= dt;
+      if (sparkLife[i] <= 0) {
+        const b = entry.bones[SPINE_NAMES[(Math.random() * SPINE_NAMES.length) | 0]];
+        b.getWorldPosition(tmp);
+        sparkPos[i * 3] = tmp.x + (Math.random() - 0.5) * 5;
+        sparkPos[i * 3 + 1] = tmp.y + (Math.random() - 0.3) * 4;
+        sparkPos[i * 3 + 2] = tmp.z + (Math.random() - 0.5) * 5;
+        sparkVel[i * 3] = (Math.random() - 0.5) * 0.8;
+        sparkVel[i * 3 + 1] = 0.8 + Math.random() * 1.6;
+        sparkVel[i * 3 + 2] = (Math.random() - 0.5) * 0.8;
+        sparkLife[i] = 1.2 + Math.random() * 1.8;
+      }
+      sparkPos[i * 3] += sparkVel[i * 3] * dt;
+      sparkPos[i * 3 + 1] += sparkVel[i * 3 + 1] * dt;
+      sparkPos[i * 3 + 2] += sparkVel[i * 3 + 2] * dt;
+      const life = sparkLife[i];
+      sparkAlpha[i] = Math.min(1, life * 1.5) * Math.min(1, (3 - life) * 2) * (0.6 + 0.4 * Math.sin(life * 18 + i));
+    }
+    sparkGeo.attributes.position.needsUpdate = true;
+    sparkGeo.attributes.alpha.needsUpdate = true;
+  }
+
+  // ---------- Interface ----------
+  const cards = document.getElementById("cards");
+  RARITIES.forEach(function (r) {
+    const b = document.createElement("button");
+    b.className = "card";
+    b.id = "card-" + r.id;
+    b.style.setProperty("--c", r.color);
+    b.setAttribute("aria-pressed", "false");
+    const sw = ["Body", "Belly", "Fins", "Horns", "Eyes"].map(function (p) {
+      return '<span style="background:' + r.parts[p] + '"></span>';
+    }).join("");
+    b.innerHTML = '<span class="rar">' + r.rarity + '</span><span class="name">' + r.name + "</span>" +
+      '<span class="swatches" aria-hidden="true">' + sw + "</span><ul>" +
+      r.points.map(function (p) { return "<li>" + p + "</li>"; }).join("") + "</ul>";
+    b.addEventListener("click", function () { select(r); });
+    cards.appendChild(b);
+  });
+
+  let current = null, currentEntry = null, mode = "Idle", token = 0;
+  function select(r) {
+    const my = ++token;
+    document.querySelectorAll(".card").forEach(function (c) { c.setAttribute("aria-pressed", String(c.id === "card-" + r.id)); });
+    document.documentElement.style.setProperty("--accent", r.color);
+    document.documentElement.style.setProperty("--glow", r.color + "33");
+    document.getElementById("badge").textContent = r.rarity;
+    document.getElementById("name").textContent = r.name;
+    document.getElementById("desc").textContent = r.desc;
+    if (!models[r.file] || !models[r.file].scene) { status.hidden = false; status.textContent = "Chargement du dragon…"; }
+    loadModel(r.file).then(function (entry) {
+      if (my !== token) return;
+      if (currentEntry && currentEntry !== entry) pivot.remove(currentEntry.scene);
+      pivot.add(entry.scene);
+      applyPalette(entry, r);
+      current = r;
+      currentEntry = entry;
+      sparks.visible = !!r.sparkles;
+      status.hidden = true;
+    }).catch(function () {
+      status.hidden = false;
+      status.textContent = "Le modèle n'a pas pu être chargé. Recharge la page pour réessayer.";
+    });
+  }
+
+  document.querySelectorAll("[data-mode]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      mode = b.dataset.mode;
+      document.querySelectorAll("[data-mode]").forEach(function (o) { o.setAttribute("aria-pressed", String(o === b)); });
+    });
+  });
+
+  select(RARITIES[0]);
+  // On précharge les formes spéciales en arrière-plan pour que le changement soit instantané.
+  setTimeout(function () { loadModel("dragon_v19_glace_rig.txt"); loadModel("dragon_v19_celeste_rig.txt"); }, 1500);
+
+  // ---------- Boucle ----------
+  const clock = new THREE.Clock();
+  let flyW = 0, flyAngle = 0;
+  const followPrev = new THREE.Vector3(), followVec = new THREE.Vector3(), followOffset = new THREE.Vector3(0, 8, 0);
+  function loop() {
+    const dt = Math.min(clock.getDelta(), 0.05);
+    if (currentEntry) {
+      currentEntry.anim.update(reduceMotion ? 0 : dt, mode);
+      // En vol, le dragon avance sur une grande boucle et la caméra le suit.
+      flyW += ((mode === "Fly" ? 1 : 0) - flyW) * Math.min(1, dt * 0.8);
+      flyAngle += dt * 0.32 * flyW;
+      const R = 38 * flyW;
+      pivot.position.set(R * Math.sin(flyAngle), 7 * flyW + 2.5 * flyW * Math.sin(flyAngle * 2.3), R * Math.cos(flyAngle) - R);
+      pivot.rotation.set(0, (flyAngle + Math.PI / 2) * flyW, -0.22 * flyW, "YXZ");
+      if (flyW > 0.01) {
+        followPrev.copy(controls.target);
+        controls.target.lerp(followVec.copy(pivot.position).add(followOffset), Math.min(1, dt * 2.5));
+        camera.position.add(followPrev.subVectors(controls.target, followPrev));
+      }
+      if (sparks.visible && !reduceMotion) {
+        scene.updateMatrixWorld();
+        updateSparks(dt, currentEntry);
+      }
+    }
+    controls.update();
+    renderer.render(scene, camera);
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+</script>
