@@ -14,7 +14,8 @@ Ce qui est animé :
     vers la queue, de même amplitude partout), puis on en déduit l'angle de chaque os. Le corps est recentré
     pour que tête, milieu et queue ondulent ensemble. En vol : longue vague souple, un peu en spirale ;
   - tête : suit la vague en plus calme, regarde autour d'elle au repos, mâchoire qui respire ;
-  - yeux : regard qui se déplace, clignements au hasard ;
+  - yeux : regard qui se déplace ; clignements avec de vraies paupières (haut et bas) qui glissent sur l'œil :
+    fermeture rapide, réouverture plus lente avec un petit rebond, parfois double, parfois lent au repos ;
   - crinière, moustaches, barbichette : flottent, plus fort en vol ;
   - pattes : marche en diagonale, repliées vers l'arrière en vol.
 ]]
@@ -25,8 +26,8 @@ local Players = game:GetService("Players")
 
 local TAG = "DragonLong"
 local MAX_DISTANCE = 400 -- au-delà, on n'anime pas (économie)
-local BLINK = 0.45      -- la paupière descend un peu (rad)…
-local SINK = 0.75       -- …et l'œil s'enfonce dans l'orbite (studs) : l'œil paraît fermé
+local BLINK_UP = 1.449  -- fermeture de la paupière du haut (rad, elle glisse vers le bas sur l'œil)
+local BLINK_LOW = 0.349 -- la paupière du bas remonte à sa rencontre
 local SEG = 0.8         -- longueur du corps par pas de colonne (studs)
 local KAPPA = 0.11      -- nombre d'onde : ~1,3 vague sur toute la longueur du corps
 
@@ -81,7 +82,7 @@ local function newState(model)
 	return {
 		model = model, bones = collectBones(model), p = p,
 		phase = rng:NextNumber(0, 6), step = 0, flutter = 0, t = 0,
-		blinkIn = rng:NextNumber(1, 4), blink = -1,
+		blinkIn = rng:NextNumber(1, 4), blink = nil,
 		look = 0, lookTarget = 0, lookIn = 1.5, headLook = 0, headTarget = 0,
 	}
 end
@@ -104,6 +105,34 @@ local function bodyAngles(st, s)
 	local env = 0.8 + 0.3 * s / 70
 	local a = KAPPA * s - st.phase
 	return p.up * env * math.sin(a), p.side * env * math.sin(a + p.helix)
+end
+
+-- Fermeture des paupières (0 = ouvert, 1 = fermé) à l'instant tt d'un clignement b.
+local function closeOnce(b, tt)
+	if tt <= 0 then
+		return 0
+	end
+	if tt < b.close then
+		local x = tt / b.close
+		return x * x -- accélère en fermant
+	end
+	if tt < b.close + b.hold then
+		return 1
+	end
+	local y = (tt - b.close - b.hold) / b.open
+	if y >= 1 then
+		return 0
+	end
+	local c1 = 1.2 -- réouverture avec léger rebond
+	local c3, z = c1 + 1, y - 1
+	return 1 - (1 + c3 * z * z * z + c1 * z * z)
+end
+
+local function closure(b, tt, one)
+	if b.twice and tt > one + 0.08 then
+		return closeOnce(b, tt - one - 0.08)
+	end
+	return closeOnce(b, tt)
 end
 
 local function update(st, dt)
@@ -170,28 +199,36 @@ local function update(st, dt)
 	setBone(st, "Head", ax.Head - ax.Neck + 0.04 * math.sin(st.t * 0.9), ay.Head - ay.Neck + st.headLook, 0)
 	setBone(st, "Jaw", p.jaw * (0.6 + 0.4 * math.sin(st.t * 1.3)), 0, 0)
 
-	-- Clignement : fermeture rapide, réouverture un peu plus lente.
+	-- Clignement : fermeture très rapide, courte pause, réouverture plus lente avec un léger rebond.
+	-- Parfois un double clignement, et au repos parfois un clignement lent et paresseux.
+	-- L'œil droit suit le gauche avec 15 ms de retard.
 	st.blinkIn -= dt
-	if st.blinkIn <= 0 and st.blink < 0 then
-		st.blink = 0
-		st.blinkIn = rng:NextNumber(2, 6)
-	end
-	local lid = 0
-	if st.blink >= 0 then
-		st.blink += dt
-		if st.blink < 0.07 then
-			lid = st.blink / 0.07
+	if st.blinkIn <= 0 and not st.blink then
+		if mode == "Idle" and rng:NextNumber(0, 1) < 0.2 then
+			st.blink = { t = 0, close = 0.3, hold = 0.25, open = 0.45, twice = false }
 		else
-			lid = math.max(0, 1 - (st.blink - 0.07) / 0.13)
+			st.blink = { t = 0, close = 0.07, hold = 0.04, open = 0.15, twice = rng:NextNumber(0, 1) < 0.15 }
 		end
-		if st.blink > 0.2 then
-			st.blink = -1
+		st.blinkIn = rng:NextNumber(2.5, 6)
+	end
+	local lidL, lidR = 0, 0
+	if st.blink then
+		local b = st.blink
+		b.t += dt
+		local one = b.close + b.hold + b.open
+		local total = b.twice and (2 * one + 0.08) or one
+		lidL = closure(b, b.t, one)
+		lidR = closure(b, b.t - 0.015, one)
+		if b.t > total + 0.05 then
+			st.blink = nil
 		end
 	end
-	setBone(st, "Lid_L", BLINK * lid, 0, 0)
-	setBone(st, "Lid_R", BLINK * lid, 0, 0)
-	setBone(st, "Eye_L", 0, st.look, 0, 0, -SINK * lid)
-	setBone(st, "Eye_R", 0, st.look, 0, 0, -SINK * lid)
+	setBone(st, "Lid_L", BLINK_UP * lidL, 0, 0)
+	setBone(st, "Lid_R", BLINK_UP * lidR, 0, 0)
+	setBone(st, "LidLow_L", -BLINK_LOW * math.max(0, lidL), 0, 0)
+	setBone(st, "LidLow_R", -BLINK_LOW * math.max(0, lidR), 0, 0)
+	setBone(st, "Eye_L", 0, st.look, 0)
+	setBone(st, "Eye_R", 0, st.look, 0)
 
 	-- Crinière, moustaches, barbichette : flottent, se soulèvent en vol et traînent derrière les mouvements
 	-- de la tête.

@@ -6,8 +6,8 @@
 // (= différence d'orientation avec l'os parent). Le corps est ensuite recentré pour que la tête, le milieu
 // et la queue ondulent tous ensemble, au lieu de rester accrochés au poitrail.
 (function (global) {
-  const BLINK = 0.45;              // la paupière descend un peu (rad)…
-  const SINK = 0.75;               // …et l'œil s'enfonce dans l'orbite (studs) : l'œil paraît fermé
+  const BLINK_UP = 1.449;          // fermeture de la paupière du haut (rad, elle glisse vers le bas sur l'œil)
+  const BLINK_LOW = 0.349;         // la paupière du bas remonte à sa rencontre
   const SEG = 0.8;                 // longueur du corps par pas de colonne (studs)
   const KAPPA = 0.11;              // nombre d'onde : ~1,3 vague sur toute la longueur du corps
 
@@ -35,11 +35,25 @@
     .map(function (n) { return SPINE.find(function (b) { return b[0] === n; }); });
   const LEGS = { LegFL: [0, 14], LegBR: [0, 42], LegFR: [Math.PI, 14], LegBL: [Math.PI, 42] };
 
+  // Fermeture des paupières (0 = ouvert, 1 = fermé) à l'instant tt d'un clignement b.
+  function closeOnce(b, tt) {
+    if (tt <= 0) return 0;
+    if (tt < b.close) { const x = tt / b.close; return x * x; }                 // accélère en fermant
+    if (tt < b.close + b.hold) return 1;
+    const y = (tt - b.close - b.hold) / b.open;
+    if (y >= 1) return 0;
+    const c1 = 1.2, c3 = c1 + 1, z = y - 1;                                     // réouverture avec léger rebond
+    return 1 - (1 + c3 * z * z * z + c1 * z * z);
+  }
+  function closure(b, tt, one) {
+    return b.twice && tt > one + 0.08 ? closeOnce(b, tt - one - 0.08) : closeOnce(b, tt);
+  }
+
   function create(bones, setBone) {
     // setBone(name, rx, ry, rz, ty, tz, tx) : rotation (X puis Y puis Z, comme CFrame.Angles) + décalage
     // le long des axes de l'os
     const st = { p: Object.assign({}, MODES.Idle), phase: 0, step: 0, flutter: 0, t: 0,
-      blinkIn: 2, blink: -1, look: 0, lookTarget: 0, lookIn: 1.5, headLook: 0, headTarget: 0 };
+      blinkIn: 2, blink: null, look: 0, lookTarget: 0, lookIn: 1.5, headLook: 0, headTarget: 0 };
     function rnd(a, b) { return a + Math.random() * (b - a); }
 
     // Forme du corps : angle de la colonne (haut/bas, côté) à la position s.
@@ -104,19 +118,32 @@
         abs.Head[1] - abs.Neck[1] + st.headLook, 0, 0, 0);
       setBone("Jaw", p.jaw * (0.6 + 0.4 * Math.sin(st.t * 1.3)), 0, 0, 0, 0);
 
-      // Clignement : fermeture rapide, réouverture un peu plus lente.
+      // Clignement : fermeture très rapide, courte pause, réouverture plus lente avec un léger rebond.
+      // Parfois un double clignement, et au repos parfois un clignement lent et paresseux.
+      // L'œil droit suit le gauche avec 15 ms de retard.
       st.blinkIn -= dt;
-      if (st.blinkIn <= 0 && st.blink < 0) { st.blink = 0; st.blinkIn = rnd(2, 6); }
-      let lid = 0;
-      if (st.blink >= 0) {
-        st.blink += dt;
-        lid = st.blink < 0.07 ? st.blink / 0.07 : Math.max(0, 1 - (st.blink - 0.07) / 0.13);
-        if (st.blink > 0.2) st.blink = -1;
+      if (st.blinkIn <= 0 && !st.blink) {
+        const lazy = mode === "Idle" && Math.random() < 0.2;
+        st.blink = lazy ? { t: 0, close: 0.3, hold: 0.25, open: 0.45, twice: false }
+                        : { t: 0, close: 0.07, hold: 0.04, open: 0.15, twice: Math.random() < 0.15 };
+        st.blinkIn = rnd(2.5, 6);
       }
-      setBone("Lid_L", BLINK * lid, 0, 0, 0, 0);
-      setBone("Lid_R", BLINK * lid, 0, 0, 0, 0);
-      setBone("Eye_L", 0, st.look, 0, 0, -SINK * lid);
-      setBone("Eye_R", 0, st.look, 0, 0, -SINK * lid);
+      let lidL = 0, lidR = 0;
+      if (st.blink) {
+        const b = st.blink;
+        b.t += dt;
+        const one = b.close + b.hold + b.open;
+        const total = b.twice ? 2 * one + 0.08 : one;
+        lidL = closure(b, b.t, one);
+        lidR = closure(b, b.t - 0.015, one);
+        if (b.t > total + 0.05) st.blink = null;
+      }
+      setBone("Lid_L", BLINK_UP * lidL, 0, 0, 0, 0);
+      setBone("Lid_R", BLINK_UP * lidR, 0, 0, 0, 0);
+      setBone("LidLow_L", -BLINK_LOW * Math.max(0, lidL), 0, 0, 0, 0);
+      setBone("LidLow_R", -BLINK_LOW * Math.max(0, lidR), 0, 0, 0, 0);
+      setBone("Eye_L", 0, st.look, 0, 0, 0);
+      setBone("Eye_R", 0, st.look, 0, 0, 0);
 
       // Crinière, moustaches, barbichette : flottent, se soulèvent en vol et traînent derrière les mouvements
       // de la tête.
@@ -142,5 +169,5 @@
     }
     return { update: update, state: st };
   }
-  global.DragonAnimator = { create: create, MODES: MODES, BLINK: BLINK, SINK: SINK };
+  global.DragonAnimator = { create: create, MODES: MODES, BLINK_UP: BLINK_UP, BLINK_LOW: BLINK_LOW };
 })(window);

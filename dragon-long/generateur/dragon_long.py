@@ -1,6 +1,7 @@
 # Dragon Long (dragon chinois) stylisé, low-poly.
 # v1 : premier croquis. v2 : écailles en relief sur le dos, plaques sur le ventre, crête plus fournie, yeux retravaillés.
 # v3 : tête plus grande et sculptée (nez de félin, sourcils dorés en volutes, barbichette, joues, rides du museau).
+# v19 : vraies paupières en coque (haut et bas) qui glissent sur l'œil pour cligner.
 # v18 : crête du dos et queue en mèches de flammes (même style que la crinière), écailles du corps couchées en tuiles.
 # v17 : cornes à anneaux et 2 branches, pattes musclées (épaule, coude en flammes, pied à 3 doigts griffus),
 #       crinière et joues en mèches de flammes épaisses.
@@ -243,6 +244,10 @@ def build_legs(a, pts, T, N, B, radii):
             a.gid = 0
 
 
+LID_UP_EDGE = 25     # bord libre de la paupière du haut, au repos (degrés autour de l'axe de l'œil)
+LID_LOW_EDGE = -70   # bord libre de la paupière du bas, au repos
+
+
 def build_eye(a, P, f, u, side_v, S):
     """Œil en amande étroit, enfoncé, mi-clos sous une paupière lourde ; poche à 2 plis dessous."""
     sd = 1 if side_v @ np.cross(u, f) > 0 else -1
@@ -256,10 +261,11 @@ def build_eye(a, P, f, u, side_v, S):
     L, Hh, D = 0.6 * S, 0.24 * S, 0.19 * S
     nm = "L" if sd > 0 else "R"
     g_head = a.gid
-    a.bone("Eye_" + nm, c, "Head", (e1, e2, out))
-    a.bone("Lid_" + nm, c, "Head", (e1, e2, out))
-    # Angle de fermeture de la paupière (rotation autour de son axe X) : le bourrelet passe devant l'œil.
-    a.blink_angle = float(np.arctan2(Hh * 0.75, D * 0.9))
+    # Repère des os de l'œil : X le long de l'œil, Y vers le haut, Z vers l'extérieur, toujours « direct »
+    # (pour l'œil gauche, e1 pointe dans l'autre sens : on prend X = Y × Z pour ne pas avoir un repère en miroir).
+    eye_frame = (normalize(np.cross(e2, out)), e2, out)
+    a.bone("Eye_" + nm, c, "Head", eye_frame)
+    a.bone("Lid_" + nm, c, "Head", eye_frame)
     a.gid = a.new_group("bone", bone="Eye_" + nm)
 
     # Amande étroite.
@@ -273,18 +279,63 @@ def build_eye(a, P, f, u, side_v, S):
     # Pupille fendue, verticale.
     a.add("Pupils", *gem(c + out * D * 0.95 + e1 * L * 0.05, e1, e2, out, 0.07 * S, Hh * 0.9, 0.06 * S))
 
+    # Paupières en coque : des morceaux de « coquille » courbe, centrés sur l'œil (surface de révolution autour
+    # de son grand axe). En tournant autour de cet axe, elles glissent sur l'œil comme un volet, sans le quitter.
+    # Angles mesurés autour de l'axe de l'œil : 0° = devant, 90° = au-dessus, -90° = en dessous.
+    R0, Lx = Hh * 1.12, L * 1.18
+
+    def lid_shell(th0, th1, r_in, r_out, nx=9, nt=7):
+        xs = np.linspace(-1, 1, nx)
+        ths = np.radians(np.linspace(th0, th1, nt))
+        prof = [max(0.08, np.sqrt(max(0.0, 1 - x * x)) ** 0.7) for x in xs]
+
+        def pt(x, th, r):
+            return c + e1 * Lx * x + (e2 * np.sin(th) + out * np.cos(th)) * r
+
+        outer = [[pt(x, th, r_out * pr) for th in ths] for x, pr in zip(xs, prof)]
+        inner = [[pt(x, th, r_in * pr) for th in ths] for x, pr in zip(xs, prof)]
+        verts, faces = [], []
+
+        def idx(layer, i, j):
+            return (layer * nx + i) * nt + j
+        for layer in (outer, inner):
+            for row in layer:
+                verts.extend(row)
+        for i in range(nx - 1):
+            for j in range(nt - 1):
+                for layer, flip in ((0, False), (1, True)):
+                    q = [idx(layer, i, j), idx(layer, i + 1, j), idx(layer, i + 1, j + 1), idx(layer, i, j + 1)]
+                    if flip:
+                        q = q[::-1]
+                    faces += [(q[0], q[1], q[2]), (q[0], q[2], q[3])]
+        # Bords : on relie la coque extérieure à la coque intérieure tout autour.
+        border = [(i, 0) for i in range(nx)] + [(nx - 1, j) for j in range(1, nt)] + \
+                 [(i, nt - 1) for i in range(nx - 2, -1, -1)] + [(0, j) for j in range(nt - 2, 0, -1)]
+        for k in range(len(border)):
+            (i0, j0), (i1, j1) = border[k], border[(k + 1) % len(border)]
+            a0, a1, b0, b1 = idx(0, i0, j0), idx(0, i1, j1), idx(1, i0, j0), idx(1, i1, j1)
+            faces += [(a0, b0, b1), (a0, b1, a1)]
+        return np.array(verts), np.array(faces)
+
+    def lid_rim(th, r, rad):
+        """Bourrelet épais le long du bord libre de la paupière."""
+        pts = [c + e1 * Lx * x * 0.97 + (e2 * np.sin(np.radians(th)) + out * np.cos(np.radians(th)))
+               * r * max(0.08, np.sqrt(max(0.0, 1 - x * x)) ** 0.7) for x in np.linspace(-1, 1, 9)]
+        return tube(pts, [0.0] + [rad * (0.6 + 0.4 * np.sqrt(max(0.0, 1 - x * x))) for x in np.linspace(-0.9, 0.9, 7)]
+                    + [0.0], 6)
+
+    # Paupière du haut : lourde, son bord descend à 25° (regard mi-clos) ; fermée, elle tourne de 90° vers le bas.
     a.gid = a.new_group("bone", bone="Lid_" + nm)
-    # Paupière du haut lourde : couvre la moitié de l'œil (regard mi-clos), plus basse côté nez (air colérique).
-    lid = [c + e1 * L * x + e2 * Hh * (0.75 - 0.35 * max(0.0, x)) + out * D * (0.45 + 0.45 * (1 - abs(x)))
-           for x in np.linspace(-1.2, 1.15, 8)]
-    a.add("Body", *tube(lid, [0.07, 0.19, 0.25, 0.28, 0.28, 0.24, 0.16, 0.06], 6, up=out))
-    # Peau granuleuse sur la paupière : une rangée de petits galets sur le bourrelet.
-    lid_r = [0.07, 0.19, 0.25, 0.28, 0.28, 0.24, 0.16, 0.06]
-    lid_up = normalize(e2 * 0.75 + out * 0.65)
-    for i in range(1, 7):
-        for off in (-0.25, 0.25):
-            q = lid[i] + (lid[i + (1 if off > 0 else -1)] - lid[i]) * abs(off) + lid_up * lid_r[i] * 0.92
-            a.add("Body", *gem(q, e1, lid_up, normalize(np.cross(lid_up, e1)), 0.06 * S, 0.035 * S, 0.06 * S))
+    a.add("Body", *lid_shell(LID_UP_EDGE, 150, R0, R0 + 0.07 * S))
+    a.add("Body", *lid_rim(LID_UP_EDGE, R0 + 0.035 * S, 0.075 * S))
+    # Paupière du bas : petite, son bord est à -70° ; elle remonte un peu à la rencontre de celle du haut.
+    a.bone("LidLow_" + nm, c, "Head", eye_frame)
+    a.gid = a.new_group("bone", bone="LidLow_" + nm)
+    a.add("Body", *lid_shell(-150, LID_LOW_EDGE, R0 * 0.98, R0 * 0.98 + 0.055 * S))
+    a.add("Body", *lid_rim(LID_LOW_EDGE, R0 * 0.98 + 0.03 * S, 0.055 * S))
+    # Angles (rad) pour fermer : le haut descend jusqu'à croiser le bas, qui remonte de 20°.
+    a.blink_up = float(np.radians(LID_UP_EDGE - LID_LOW_EDGE - 20 + 8))
+    a.blink_low = float(np.radians(20))
 
     a.gid = g_head
     # Poche sous l'œil : 2 plis superposés en croissant, posés sur la peau.
@@ -950,7 +1001,7 @@ SPINE_BONES = [(0, "Head"), (5, "Neck"), (10, "Neck2"), (14, "Root")] + [(18 + 4
 
 
 def build():
-    a = Asset("Dragon_Long_v18")
+    a = Asset("Dragon_Long_v19")
     for name, (color, mat) in COULEURS.items():
         a.part(name, color, mat)
     pts = catmull_rom(SPINE, RINGS)

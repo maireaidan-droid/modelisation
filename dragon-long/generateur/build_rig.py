@@ -113,8 +113,7 @@ def orthonormal(m):
     u, _, vt = np.linalg.svd(m)
     r = u @ vt
     if np.linalg.det(r) < 0:
-        u[:, -1] *= -1
-        r = u @ vt
+        raise ValueError("repère d'os en miroir (main gauche) : il faut un repère direct")
     return r
 
 
@@ -241,7 +240,7 @@ def main():
 
     rig = {"name": name, "tris": a.tri_count(), "bones": order,
            "parents": {n: a.bones[n]["parent"] for n in order},
-           "blink_angle_rad": round(a.blink_angle, 3), "parts": stats}
+           "blink_up_rad": round(a.blink_up, 3), "blink_low_rad": round(a.blink_low, 3), "parts": stats}
     with open(os.path.join(OUT, name + ".json"), "w") as fh:
         json.dump(rig, fh, indent=2, ensure_ascii=False)
     print(path, len(order), "os", a.tri_count(), "triangles", os.path.getsize(path) // 1024, "Ko")

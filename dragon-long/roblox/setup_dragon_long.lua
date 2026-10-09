@@ -1,8 +1,8 @@
 --[[
-Dragon Long v18 : réglages automatiques après l'import dans Roblox Studio.
+Dragon Long v19 : réglages automatiques après l'import dans Roblox Studio.
 
 Utilisation :
-  1. Importer Dragon_Long_v18_rig.glb (version animable, avec squelette) ou Dragon_Long_v18.glb (statique)
+  1. Importer Dragon_Long_v19_rig.glb (version animable, avec squelette) ou Dragon_Long_v19.glb (statique)
      (Avatar > Import 3D, unité Stud, parties séparées, Anchored).
   2. Sélectionner le modèle importé dans l'Explorer (sinon le script cherche un modèle « Dragon_Long_v… » dans le Workspace).
   3. Affichage > Barre de commande (View > Command Bar), coller TOUT ce script, Entrée.
@@ -37,7 +37,7 @@ local EXPECTED_LENGTH = 58 -- studs, environ
 -- 1. Trouver le modèle
 local model = Selection:Get()[1]
 if not (model and model:IsA("Model")) then
-	model = workspace:FindFirstChild("Dragon_Long_v18", true)
+	model = workspace:FindFirstChild("Dragon_Long_v19", true)
 end
 if not (model and model:IsA("Model")) then
 	for _, m in ipairs(workspace:GetDescendants()) do
