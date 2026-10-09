@@ -197,12 +197,12 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
   const bones = {}, rest = {};
   const euler = new THREE.Euler(), quat = new THREE.Quaternion(), off = new THREE.Vector3();
   let anim = null;
-  function setBone(name, rx, ry, rz, ty, tz) {
+  function setBone(name, rx, ry, rz, ty, tz, tx) {
     const b = bones[name];
     if (!b) return;
     euler.set(rx, ry, rz, "XYZ");
     b.quaternion.copy(rest[name].q).multiply(quat.setFromEuler(euler));
-    off.set(0, ty || 0, tz || 0).applyQuaternion(rest[name].q);
+    off.set(tx || 0, ty || 0, tz || 0).applyQuaternion(rest[name].q);
     b.position.copy(rest[name].p).add(off);
   }
 

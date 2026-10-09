@@ -10,8 +10,11 @@ Le mode se choisit avec l'attribut « Mode » du Model (réglable depuis un scri
   "Idle" (repos), "Walk" (marche), "Fly" (vol). Les changements de mode sont progressifs.
 
 Ce qui est animé :
-  - corps : ondulation qui part du cou et grandit vers la queue ;
-  - tête : reste stable pendant l'ondulation, regarde autour d'elle au repos, mâchoire qui respire ;
+  - corps : piloté comme un serpent. On décrit la forme voulue de tout le corps (une vague qui glisse de la tête
+    vers la queue, de même amplitude partout), puis on en déduit l'angle de chaque os. Le corps est recentré
+    pour que tête, milieu et queue ondulent ensemble. En vol : longue vague souple, un peu en spirale, et un
+    tonneau lent de temps en temps ;
+  - tête : suit la vague en plus calme, regarde autour d'elle au repos, mâchoire qui respire ;
   - yeux : regard qui se déplace, clignements au hasard ;
   - crinière, moustaches, barbichette : flottent, plus fort en vol ;
   - pattes : marche en diagonale, repliées vers l'arrière en vol.
@@ -25,24 +28,37 @@ local TAG = "DragonLong"
 local MAX_DISTANCE = 400 -- au-delà, on n'anime pas (économie)
 local BLINK = 0.45      -- la paupière descend un peu (rad)…
 local SINK = 0.75       -- …et l'œil s'enfonce dans l'orbite (studs) : l'œil paraît fermé
+local SEG = 0.8         -- longueur du corps par pas de colonne (studs)
+local KAPPA = 0.11      -- nombre d'onde : ~1,3 vague sur toute la longueur du corps
 
+-- up / side : amplitude de la vague verticale / latérale (rad) ; speed : vitesse de la vague (rad/s) ;
+-- helix : décalage entre les deux (pi/2 = chaque anneau décrit un cercle, le corps s'enroule en spirale) ;
+-- center : recentrage du corps (1 = tout le corps ondule autour de son milieu, 0 = ancré au poitrail) ;
+-- roll : 1 = tonneau lent de temps en temps.
 local MODES = {
-	Idle = { side = 0.035, pitch = 0.015, wave = 1.2, tuck = 0, walk = 0, mane = 0.12, maneSpeed = 1.6, jaw = 0.04, bob = 0.15, bank = 0, dive = 0, neck = 0.75, sway = 0, swayPh = 0, tail = 1, helix = 0 },
-	Walk = { side = 0.07, pitch = 0.012, wave = 3.4, tuck = 0, walk = 1, mane = 0.2, maneSpeed = 3.2, jaw = 0.07, bob = 0.2, bank = 0, dive = 0, neck = 0.75, sway = 0, swayPh = 0, tail = 1, helix = 0 },
-	-- Vol : vague en spirale (le corps s'enroule comme un tire-bouchon, comme les dragons chinois) + tonneaux,
-	-- grandes vagues qui descendent du cou vers la queue (le dragon « nage » dans l'air),
-	-- un peu de roulis et de tangage de tout le corps, crinière soulevée qui claque au vent.
-	-- neck : force de l'onde dans le cou ; sway : bascule du poitrail (fait bouger tout l'avant) ; tail : force dans la queue.
-	Fly  = { side = 0.05, pitch = 0.1, wave = 2.6, tuck = 1, walk = 0, mane = 0.5, maneSpeed = 7, jaw = 0.14, bob = 1.4, bank = 0.12, dive = 0.05,
-		neck = 1.0, sway = 0.18, swayPh = 2.0, tail = 0.5, helix = 1 },
+	Idle = { up = 0.03, side = 0.06, speed = 1.2, helix = 0, center = 0, tuck = 0, walk = 0, mane = 0.12, maneSpeed = 1.6,
+		jaw = 0.04, bob = 0.15, bank = 0, roll = 0, head = 0.6 },
+	Walk = { up = 0.02, side = 0.13, speed = 3.4, helix = 0, center = 0, tuck = 0, walk = 1, mane = 0.2, maneSpeed = 3.2,
+		jaw = 0.07, bob = 0.2, bank = 0, roll = 0, head = 0.5 },
+	Fly = { up = 0.34, side = 0.16, speed = 2.0, helix = 1.57, center = 1, tuck = 1, walk = 0, mane = 0.42, maneSpeed = 5,
+		jaw = 0.12, bob = 0.8, bank = 0.1, roll = 1, head = 0.45 },
 }
 
-local TAIL = {}
+-- Colonne, de la tête à la queue : { os, position le long du corps (pas de colonne), parent }.
+local SPINE = { { "Head", 0, "Neck" }, { "Neck", 5, "Neck2" }, { "Neck2", 10, "Root" }, { "Root", 14, nil } }
 for k = 1, 14 do
-	TAIL[k] = string.format("S%02d", k)
+	table.insert(SPINE, { string.format("S%02d", k), 14 + 4 * k, k == 1 and "Root" or string.format("S%02d", k - 1) })
 end
-local NECK = { { "Neck2", -1 }, { "Neck", -2 } }
-local LEGS = { LegFL = 0, LegBR = 0, LegFR = math.pi, LegBL = math.pi }
+local BY_NAME = {}
+for _, b in ipairs(SPINE) do
+	BY_NAME[b[1]] = b
+end
+-- Ordre parent → enfant (pour cumuler les positions depuis le poitrail).
+local ORDER = { BY_NAME.Root, BY_NAME.Neck2, BY_NAME.Neck, BY_NAME.Head }
+for k = 5, #SPINE do
+	table.insert(ORDER, SPINE[k])
+end
+local LEGS = { LegFL = { 0, 14 }, LegBR = { 0, 42 }, LegFR = { math.pi, 14 }, LegBL = { math.pi, 42 } }
 
 local rng = Random.new()
 local dragons = {} -- [Model] = état
@@ -67,20 +83,29 @@ local function newState(model)
 	return {
 		model = model, bones = collectBones(model), p = p,
 		phase = rng:NextNumber(0, 6), step = 0, flutter = 0, t = 0,
-		blinkIn = rng:NextNumber(1, 4), blink = -1, rollIn = 3, roll = -1,
+		blinkIn = rng:NextNumber(1, 4), blink = -1, rollIn = 6, roll = -1,
 		look = 0, lookTarget = 0, lookIn = 1.5, headLook = 0, headTarget = 0,
 	}
 end
 
-local function setBone(st, name, rx, ry, rz, ty, tz)
+-- Rotation (X puis Y puis Z, comme CFrame.Angles) + décalage le long des axes de l'os.
+local function setBone(st, name, rx, ry, rz, ty, tz, tx)
 	local list = st.bones[name]
 	if not list then
 		return
 	end
-	local cf = CFrame.new(0, ty or 0, tz or 0) * CFrame.Angles(rx, ry, rz)
+	local cf = CFrame.new(tx or 0, ty or 0, tz or 0) * CFrame.Angles(rx, ry, rz)
 	for _, b in ipairs(list) do
 		b.Transform = cf
 	end
+end
+
+-- Forme du corps : angle de la colonne (haut/bas, côté) à la position s.
+local function bodyAngles(st, s)
+	local p = st.p
+	local env = 0.8 + 0.3 * s / 70
+	local a = KAPPA * s - st.phase
+	return p.up * env * math.sin(a), p.side * env * math.sin(a + p.helix)
 end
 
 local function update(st, dt)
@@ -89,57 +114,69 @@ local function update(st, dt)
 	mode = MODES[mode] and mode or "Idle"
 	st.t += dt
 	local p = st.p
-	local k = math.min(1, dt * 2.5)
+	local k = math.min(1, dt * 1.8)
 	for key, v in pairs(target) do
 		p[key] += (v - p[key]) * k
 	end
-	st.phase += dt * p.wave
+	st.phase += dt * p.speed
 	st.step += dt * 4.2 * p.walk
 	st.flutter += dt * p.maneSpeed
 
-	-- Colonne : une onde qui part du cou et grandit vers la queue.
-	for i, name in ipairs(TAIL) do
-		local grow = 0.6 + 0.4 * i / 14
-		-- helix = 1 : le côté suit le haut/bas avec un quart de tour d'avance, chaque anneau décrit un cercle.
-		local amp = p.pitch * p.tail * grow
-		local yaw = p.side * grow * math.sin(st.phase * 0.7 - i * 0.4 + 1) * (1 - p.helix)
-			+ amp * p.helix * math.cos(st.phase - i * 0.45)
-		local pitch = amp * math.sin(st.phase - i * 0.45)
-		setBone(st, name, pitch, yaw, 0)
+	-- 1. Orientation voulue de chaque morceau de colonne.
+	local ax, ay = {}, {}
+	for _, b in ipairs(SPINE) do
+		ax[b[1]], ay[b[1]] = bodyAngles(st, b[2])
 	end
-	-- Cou : la même onde continue jusqu'à la tête (signe inversé : ces os pointent vers l'avant).
-	local neckPitch, neckYaw = 0, 0
-	for _, n in ipairs(NECK) do
-		local k1 = n[2]
-		local yaw = -p.side * p.neck * math.sin(st.phase * 0.7 - k1 * 0.4 + 1) * (1 - p.helix)
-			- p.pitch * p.neck * p.helix * math.cos(st.phase - k1 * 0.45)
-		local pitch = -p.pitch * p.neck * math.sin(st.phase - k1 * 0.45)
-		setBone(st, n[1], pitch, yaw, 0)
-		neckPitch += pitch
-		neckYaw += yaw
+	ax.Head *= p.head -- la tête suit la vague, en plus calme
+	ay.Head *= p.head
+
+	-- 2. Recentrage : position (haut/bas, côté) de chaque articulation par rapport au poitrail.
+	local py, px = { Root = 0 }, { Root = 0 }
+	for _, b in ipairs(ORDER) do
+		local name, parent = b[1], b[3]
+		if parent then
+			local pb = BY_NAME[parent]
+			local len = math.abs(b[2] - pb[2]) * SEG
+			local dir = b[2] > pb[2] and 1 or -1 -- vers la queue : +1
+			py[name] = py[parent] + dir * len * math.sin(ax[parent])
+			px[name] = px[parent] - dir * len * math.sin(ay[parent])
+		end
 	end
-	-- Tout le corps : monte et descend, pique légèrement et s'incline (roulis) en vol.
-	-- sway : le poitrail bascule au rythme de la vague, ce qui fait monter et descendre tout l'avant.
-	-- Tonneau : en vol, toutes les 6 à 10 s, le dragon fait un tour complet sur lui-même (2,4 s).
-	st.rollIn -= dt * p.helix
-	if st.rollIn <= 0 and st.roll < 0 and p.helix > 0.9 then
+	local sumY, sumX = 0, 0
+	for _, b in ipairs(SPINE) do
+		sumY += py[b[1]]
+		sumX += px[b[1]]
+	end
+	local cy, cx = -sumY / #SPINE * p.center, -sumX / #SPINE * p.center
+
+	-- 3. Tonneau lent, de temps en temps, en vol.
+	st.rollIn -= dt * p.roll
+	if st.rollIn <= 0 and st.roll < 0 and p.roll > 0.9 then
 		st.roll = 0
-		st.rollIn = rng:NextNumber(6, 10)
+		st.rollIn = rng:NextNumber(12, 18)
 	end
 	local rollAngle = 0
 	if st.roll >= 0 then
-		st.roll += dt / 2.4
+		st.roll += dt / 3.5
 		local r = math.min(1, st.roll)
 		rollAngle = 2 * math.pi * r * r * (3 - 2 * r)
 		if st.roll >= 1 then
 			st.roll = -1
 		end
 	end
-	setBone(st, "Root", p.dive * math.sin(st.phase * 0.5) + p.sway * math.sin(st.phase + p.swayPh), 0,
-		p.bank * math.sin(st.phase * 0.35) + rollAngle,
-		p.bob * math.sin(st.phase * 0.5 + 1) + 0.12 * p.walk * math.abs(math.sin(st.step)))
 
-	-- Tête : compense l'ondulation pour garder le regard stable, et regarde autour d'elle au repos.
+	-- 4. Angles relatifs (os par rapport à son parent).
+	for _, b in ipairs(SPINE) do
+		local name, parent = b[1], b[3]
+		if name == "Root" then
+			setBone(st, "Root", ax.Root, ay.Root, p.bank * math.sin(st.phase * 0.3) + rollAngle,
+				cy + p.bob * math.sin(st.phase * 0.4 + 1) + 0.12 * p.walk * math.abs(math.sin(st.step)), 0, cx)
+		elseif name ~= "Head" then
+			setBone(st, name, ax[name] - ax[parent], ay[name] - ay[parent], 0)
+		end
+	end
+
+	-- Tête : suit la vague (en plus calme) et regarde autour d'elle au repos.
 	st.lookIn -= dt
 	if st.lookIn <= 0 then
 		st.lookIn = rng:NextNumber(1.5, 4)
@@ -148,8 +185,7 @@ local function update(st, dt)
 	end
 	st.look += (st.lookTarget - st.look) * math.min(1, dt * 6)
 	st.headLook += (st.headTarget - st.headLook) * math.min(1, dt * 1.5)
-	-- La tête suit la vague et n'en compense qu'une partie : elle mène le mouvement.
-	setBone(st, "Head", 0.05 * math.sin(st.t * 0.9) - neckPitch * 0.2, -neckYaw * 0.4 + st.headLook, 0)
+	setBone(st, "Head", ax.Head - ax.Neck + 0.04 * math.sin(st.t * 0.9), ay.Head - ay.Neck + st.headLook, 0)
 	setBone(st, "Jaw", p.jaw * (0.6 + 0.4 * math.sin(st.t * 1.3)), 0, 0)
 
 	-- Clignement : fermeture rapide, réouverture un peu plus lente.
@@ -175,24 +211,25 @@ local function update(st, dt)
 	setBone(st, "Eye_L", 0, st.look, 0, 0, -SINK * lid)
 	setBone(st, "Eye_R", 0, st.look, 0, 0, -SINK * lid)
 
-	-- Crinière, moustaches, barbichette : flottent, plus fort en vol.
-	local f, m = st.flutter, p.mane
-	local lift = 0.25 * p.tuck -- en vol, la crinière se soulève et part vers l'arrière
-	setBone(st, "Mane_Top", lift + 0.5 * m * math.sin(f), m * math.sin(f * 1.3 + 1), 0)
-	setBone(st, "Mane_L", lift + 0.6 * m * math.sin(f + 2), m * math.sin(f * 1.1 + 0.5), 0)
-	setBone(st, "Mane_R", lift + 0.6 * m * math.sin(f + 2.6), -m * math.sin(f * 1.1 + 1.2), 0)
-	setBone(st, "Whisker_L", 0.8 * m * math.sin(f * 0.9), m * math.sin(f * 0.7 + 0.3), 0)
-	setBone(st, "Whisker_R", 0.8 * m * math.sin(f * 0.9 + 1), -m * math.sin(f * 0.7 + 1.1), 0)
-	setBone(st, "Beard", 0.5 * m * math.sin(f * 0.8), 0.4 * m * math.sin(f * 1.2), 0)
+	-- Crinière, moustaches, barbichette : flottent, se soulèvent en vol et traînent derrière les mouvements
+	-- de la tête.
+	local f, m, lift = st.flutter, p.mane, 0.22 * p.tuck
+	local drag, dragY = -0.8 * (ax.Neck - ax.Neck2), -0.8 * (ay.Neck - ay.Neck2)
+	setBone(st, "Mane_Top", lift + drag + 0.5 * m * math.sin(f), dragY + m * math.sin(f * 1.3 + 1), 0)
+	setBone(st, "Mane_L", lift + drag + 0.6 * m * math.sin(f + 2), dragY + m * math.sin(f * 1.1 + 0.5), 0)
+	setBone(st, "Mane_R", lift + drag + 0.6 * m * math.sin(f + 2.6), dragY - m * math.sin(f * 1.1 + 1.2), 0)
+	setBone(st, "Whisker_L", 0.8 * m * math.sin(f * 0.9) + drag, m * math.sin(f * 0.7 + 0.3) + dragY, 0)
+	setBone(st, "Whisker_R", 0.8 * m * math.sin(f * 0.9 + 1) + drag, -m * math.sin(f * 0.7 + 1.1) + dragY, 0)
+	setBone(st, "Beard", 0.5 * m * math.sin(f * 0.8) + drag, 0.4 * m * math.sin(f * 1.2), 0)
 
-	-- Pattes : marche en diagonale (avant gauche + arrière droite, puis l'inverse), repliées en vol.
-	for leg, offset in pairs(LEGS) do
-		local ph = st.step + offset
-		local sw, lift = math.sin(ph), math.max(0, math.cos(ph))
-		local paddle = 0.15 * p.tuck * math.sin(st.phase * 1.5 + offset) -- pattes qui pagaient en vol
-		setBone(st, leg .. "_Upper", -0.45 * sw * p.walk + 0.9 * p.tuck + paddle, 0, 0)
-		setBone(st, leg .. "_Fore", 0.6 * lift * p.walk + 0.6 * p.tuck, 0, 0)
-		setBone(st, leg .. "_Foot", -0.35 * lift * p.walk - 0.4 * p.tuck, 0, 0)
+	-- Pattes : marche en diagonale ; en vol, repliées et elles suivent doucement la vague du corps.
+	for leg, info in pairs(LEGS) do
+		local ph = st.step + info[1]
+		local sw, up = math.sin(ph), math.max(0, math.cos(ph))
+		local flow = 0.5 * (bodyAngles(st, info[2] + 6)) * p.tuck
+		setBone(st, leg .. "_Upper", -0.45 * sw * p.walk + 0.9 * p.tuck + flow, 0, 0)
+		setBone(st, leg .. "_Fore", 0.6 * up * p.walk + 0.6 * p.tuck + flow, 0, 0)
+		setBone(st, leg .. "_Foot", -0.35 * up * p.walk - 0.4 * p.tuck, 0, 0)
 	end
 end
 
