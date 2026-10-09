@@ -16,13 +16,13 @@
   // center : recentrage du corps (1 = tout le corps ondule autour de son milieu, 0 = ancré au poitrail).
   const MODES = {
     Idle: { up: 0.03, side: 0.06, speed: 1.2, helix: 0, center: 0, tuck: 0, walk: 0, mane: 0.12, maneSpeed: 1.6,
-            jaw: 0.04, bob: 0.15, bank: 0, roll: 0, head: 0.6 },
+            jaw: 0.04, bob: 0.15, bank: 0, head: 0.6 },
     Walk: { up: 0.02, side: 0.13, speed: 3.4, helix: 0, center: 0, tuck: 0, walk: 1, mane: 0.2, maneSpeed: 3.2,
-            jaw: 0.07, bob: 0.2, bank: 0, roll: 0, head: 0.5 },
+            jaw: 0.07, bob: 0.2, bank: 0, head: 0.5 },
     // Vol : longue vague souple et continue de la tête à la queue, un peu en spirale ; le dragon « nage » dans
-    // l'air. Léger roulis, crinière soulevée, pattes repliées qui suivent la vague. Tonneau lent de temps en temps.
+    // l'air. Léger roulis, crinière soulevée, pattes repliées qui suivent la vague.
     Fly:  { up: 0.34, side: 0.16, speed: 2.0, helix: 1.57, center: 1, tuck: 1, walk: 0, mane: 0.42, maneSpeed: 5,
-            jaw: 0.12, bob: 0.8, bank: 0.1, roll: 1, head: 0.45 }
+            jaw: 0.12, bob: 0.8, bank: 0.1, head: 0.45 }
   };
 
   // Colonne, de la tête à la queue : [os, position le long du corps (pas de colonne), parent].
@@ -39,7 +39,7 @@
     // setBone(name, rx, ry, rz, ty, tz, tx) : rotation (X puis Y puis Z, comme CFrame.Angles) + décalage
     // le long des axes de l'os
     const st = { p: Object.assign({}, MODES.Idle), phase: 0, step: 0, flutter: 0, t: 0,
-      blinkIn: 2, blink: -1, rollIn: 6, roll: -1, look: 0, lookTarget: 0, lookIn: 1.5, headLook: 0, headTarget: 0 };
+      blinkIn: 2, blink: -1, look: 0, lookTarget: 0, lookIn: 1.5, headLook: 0, headTarget: 0 };
     function rnd(a, b) { return a + Math.random() * (b - a); }
 
     // Forme du corps : angle de la colonne (haut/bas, côté) à la position s.
@@ -78,23 +78,12 @@
       SPINE.forEach(function (b) { sumY += pos[b[0]][0]; sumX += pos[b[0]][1]; });
       const cy = -sumY / SPINE.length * p.center, cx = -sumX / SPINE.length * p.center;
 
-      // 3. Tonneau lent, de temps en temps, en vol.
-      st.rollIn -= dt * p.roll;
-      if (st.rollIn <= 0 && st.roll < 0 && p.roll > 0.9) { st.roll = 0; st.rollIn = rnd(12, 18); }
-      let rollAngle = 0;
-      if (st.roll >= 0) {
-        st.roll += dt / 3.5;
-        const r = Math.min(1, st.roll);
-        rollAngle = 2 * Math.PI * r * r * (3 - 2 * r);
-        if (st.roll >= 1) st.roll = -1;
-      }
-
-      // 4. Angles relatifs (os par rapport à son parent).
+      // 3. Angles relatifs (os par rapport à son parent).
       SPINE.forEach(function (b) {
         const name = b[0], parent = b[2], a = abs[name];
         if (name === "Head") return;
         if (!parent) {
-          setBone("Root", a[0], a[1], p.bank * Math.sin(st.phase * 0.3) + rollAngle,
+          setBone("Root", a[0], a[1], p.bank * Math.sin(st.phase * 0.3),
             cy + p.bob * Math.sin(st.phase * 0.4 + 1) + 0.12 * p.walk * Math.abs(Math.sin(st.step)), 0, cx);
           return;
         }

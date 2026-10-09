@@ -12,8 +12,7 @@ Le mode se choisit avec l'attribut « Mode » du Model (réglable depuis un scri
 Ce qui est animé :
   - corps : piloté comme un serpent. On décrit la forme voulue de tout le corps (une vague qui glisse de la tête
     vers la queue, de même amplitude partout), puis on en déduit l'angle de chaque os. Le corps est recentré
-    pour que tête, milieu et queue ondulent ensemble. En vol : longue vague souple, un peu en spirale, et un
-    tonneau lent de temps en temps ;
+    pour que tête, milieu et queue ondulent ensemble. En vol : longue vague souple, un peu en spirale ;
   - tête : suit la vague en plus calme, regarde autour d'elle au repos, mâchoire qui respire ;
   - yeux : regard qui se déplace, clignements au hasard ;
   - crinière, moustaches, barbichette : flottent, plus fort en vol ;
@@ -33,15 +32,14 @@ local KAPPA = 0.11      -- nombre d'onde : ~1,3 vague sur toute la longueur du c
 
 -- up / side : amplitude de la vague verticale / latérale (rad) ; speed : vitesse de la vague (rad/s) ;
 -- helix : décalage entre les deux (pi/2 = chaque anneau décrit un cercle, le corps s'enroule en spirale) ;
--- center : recentrage du corps (1 = tout le corps ondule autour de son milieu, 0 = ancré au poitrail) ;
--- roll : 1 = tonneau lent de temps en temps.
+-- center : recentrage du corps (1 = tout le corps ondule autour de son milieu, 0 = ancré au poitrail).
 local MODES = {
 	Idle = { up = 0.03, side = 0.06, speed = 1.2, helix = 0, center = 0, tuck = 0, walk = 0, mane = 0.12, maneSpeed = 1.6,
-		jaw = 0.04, bob = 0.15, bank = 0, roll = 0, head = 0.6 },
+		jaw = 0.04, bob = 0.15, bank = 0, head = 0.6 },
 	Walk = { up = 0.02, side = 0.13, speed = 3.4, helix = 0, center = 0, tuck = 0, walk = 1, mane = 0.2, maneSpeed = 3.2,
-		jaw = 0.07, bob = 0.2, bank = 0, roll = 0, head = 0.5 },
+		jaw = 0.07, bob = 0.2, bank = 0, head = 0.5 },
 	Fly = { up = 0.34, side = 0.16, speed = 2.0, helix = 1.57, center = 1, tuck = 1, walk = 0, mane = 0.42, maneSpeed = 5,
-		jaw = 0.12, bob = 0.8, bank = 0.1, roll = 1, head = 0.45 },
+		jaw = 0.12, bob = 0.8, bank = 0.1, head = 0.45 },
 }
 
 -- Colonne, de la tête à la queue : { os, position le long du corps (pas de colonne), parent }.
@@ -83,7 +81,7 @@ local function newState(model)
 	return {
 		model = model, bones = collectBones(model), p = p,
 		phase = rng:NextNumber(0, 6), step = 0, flutter = 0, t = 0,
-		blinkIn = rng:NextNumber(1, 4), blink = -1, rollIn = 6, roll = -1,
+		blinkIn = rng:NextNumber(1, 4), blink = -1,
 		look = 0, lookTarget = 0, lookIn = 1.5, headLook = 0, headTarget = 0,
 	}
 end
@@ -149,27 +147,11 @@ local function update(st, dt)
 	end
 	local cy, cx = -sumY / #SPINE * p.center, -sumX / #SPINE * p.center
 
-	-- 3. Tonneau lent, de temps en temps, en vol.
-	st.rollIn -= dt * p.roll
-	if st.rollIn <= 0 and st.roll < 0 and p.roll > 0.9 then
-		st.roll = 0
-		st.rollIn = rng:NextNumber(12, 18)
-	end
-	local rollAngle = 0
-	if st.roll >= 0 then
-		st.roll += dt / 3.5
-		local r = math.min(1, st.roll)
-		rollAngle = 2 * math.pi * r * r * (3 - 2 * r)
-		if st.roll >= 1 then
-			st.roll = -1
-		end
-	end
-
-	-- 4. Angles relatifs (os par rapport à son parent).
+	-- 3. Angles relatifs (os par rapport à son parent).
 	for _, b in ipairs(SPINE) do
 		local name, parent = b[1], b[3]
 		if name == "Root" then
-			setBone(st, "Root", ax.Root, ay.Root, p.bank * math.sin(st.phase * 0.3) + rollAngle,
+			setBone(st, "Root", ax.Root, ay.Root, p.bank * math.sin(st.phase * 0.3),
 				cy + p.bob * math.sin(st.phase * 0.4 + 1) + 0.12 * p.walk * math.abs(math.sin(st.step)), 0, cx)
 		elseif name ~= "Head" then
 			setBone(st, name, ax[name] - ax[parent], ay[name] - ay[parent], 0)
