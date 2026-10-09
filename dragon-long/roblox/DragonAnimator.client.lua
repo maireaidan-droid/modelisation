@@ -19,7 +19,7 @@ Ce qui est animé :
   - crinière, moustaches, barbichette : flottent, plus fort en vol ;
   - pattes : marche en diagonale, repliées vers l'arrière en vol ;
   - Mythique (Dragon_Long_v19_neant_rig) : les cristaux flottants (os Crest1 à Crest8) montent et descendent,
-    et une vague de lumière court des cornes à la queue (parties Crest1…, BellyGlow1…, Horns, Nebula).
+    et une vague de lumière court des cornes à la queue (parties Crest1…, BellyGlow1…, Horns, Eyes).
     Les autres dragons n'ont pas ces os ni ces parties : rien ne se passe pour eux.
 ]]
 
@@ -38,7 +38,6 @@ local PUPIL_FWD_L, PUPIL_FWD_R = -1, 1 -- sens « vers l'avant » de l'axe X de 
 local SEG = 0.8         -- longueur du corps par pas de colonne (studs)
 local KAPPA = 0.11      -- nombre d'onde : ~1,3 vague sur toute la longueur du corps
 local PULSE_SEGMENTS, PULSE_STEP = 8, 0.6 -- Mythique : tronçons de la vague de lumière, décalage entre deux
-local PULSE_TAIL = 7    -- la nébuleuse s'illumine juste après le dernier tronçon de crête
 local WHITE, LILAC = Color3.new(1, 1, 1), Color3.fromHex("#C9A2FF")
 
 -- up / side : amplitude de la vague verticale / latérale (rad) ; speed : vitesse de la vague (rad/s) ;
@@ -86,22 +85,24 @@ end
 
 -- Parties qui s'allument au passage de la vague (Mythique) : { part, tronçon, couleur de repos, couleur au pic, force }.
 local function collectGlow(model)
-	local list = {}
+	local list, mythic = {}, false
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("BasePart") then
 			local kind, n = string.match(d.Name, "^(%a+)(%d+)$")
 			if kind == "Crest" then
+				mythic = true
 				table.insert(list, { d, tonumber(n), d.Color, WHITE, 0.55 })
 			elseif kind == "BellyGlow" then
 				table.insert(list, { d, tonumber(n), d.Color, LILAC, 0.7 })
 			elseif d.Name == "Horns" then
 				table.insert(list, { d, 0, d.Color, WHITE, 0.4 })
-			elseif d.Name == "Nebula" then
-				table.insert(list, { d, PULSE_TAIL, d.Color, WHITE, 0.45 })
+			elseif d.Name == "Eyes" then
+				table.insert(list, { d, 0, d.Color, WHITE, 0.5 })
 			end
 		end
 	end
-	return list
+	-- Seul le Mythique (qui a des tronçons Crest) pulse : les cornes et les yeux des autres dragons ne changent pas.
+	return mythic and list or {}
 end
 
 local function newState(model)

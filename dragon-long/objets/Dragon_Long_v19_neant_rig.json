@@ -1,6 +1,6 @@
 {
   "name": "Dragon_Long_v19_neant_rig",
-  "tris": 27882,
+  "tris": 29278,
   "bones": [
     "Root",
     "Neck2",
@@ -25,6 +25,8 @@
     "Crest4",
     "Crest5",
     "Crest6",
+    "Crest7",
+    "Crest8",
     "LegFL_Upper",
     "LegFL_Fore",
     "LegFL_Foot",
@@ -78,6 +80,8 @@
     "Crest4": "S04",
     "Crest5": "S07",
     "Crest6": "S08",
+    "Crest7": "S10",
+    "Crest8": "S13",
     "LegFL_Upper": "Root",
     "LegFL_Fore": "LegFL_Upper",
     "LegFL_Foot": "LegFL_Fore",
@@ -120,12 +124,12 @@
   },
   "parts": {
     "Body": {
-      "tris": 14226,
+      "tris": 15674,
       "color": "#2F7D63",
       "material": "SmoothPlastic"
     },
     "Belly": {
-      "tris": 386,
+      "tris": 506,
       "color": "#E2B65C",
       "material": "SmoothPlastic"
     },
@@ -190,7 +194,17 @@
       "material": "SmoothPlastic"
     },
     "BellyGlow6": {
-      "tris": 126,
+      "tris": 336,
+      "color": "#E2B65C",
+      "material": "SmoothPlastic"
+    },
+    "BellyGlow7": {
+      "tris": 336,
+      "color": "#E2B65C",
+      "material": "SmoothPlastic"
+    },
+    "BellyGlow8": {
+      "tris": 378,
       "color": "#E2B65C",
       "material": "SmoothPlastic"
     },
@@ -215,19 +229,24 @@
       "material": "SmoothPlastic"
     },
     "Crest5": {
-      "tris": 120,
+      "tris": 168,
       "color": "#C8432F",
       "material": "SmoothPlastic"
     },
     "Crest6": {
-      "tris": 120,
+      "tris": 216,
       "color": "#C8432F",
       "material": "SmoothPlastic"
     },
-    "Nebula": {
-      "tris": 1816,
-      "color": "#B98CFF",
-      "material": "Neon"
+    "Crest7": {
+      "tris": 288,
+      "color": "#C8432F",
+      "material": "SmoothPlastic"
+    },
+    "Crest8": {
+      "tris": 288,
+      "color": "#C8432F",
+      "material": "SmoothPlastic"
     }
   }
 }

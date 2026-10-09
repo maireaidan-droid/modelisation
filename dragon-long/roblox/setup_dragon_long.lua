@@ -33,12 +33,11 @@ local PARTS = {
 	Tongue   = { color = "#B9434C", material = Enum.Material.SmoothPlastic, shadow = false },
 }
 -- Mythique (Dragon_Long_v19_neant_rig) : crête et ventre découpés en tronçons numérotés (Crest1…, BellyGlow1…)
--- pour la vague de lumière, et queue en nébuleuse. On garde leurs noms tels quels (DragonAnimator s'en sert).
+-- pour la vague de lumière. On garde leurs noms tels quels (DragonAnimator s'en sert).
 local SEGMENTS = {
 	Crest     = { like = "Fins", material = Enum.Material.Neon },
 	BellyGlow = { like = "Belly" },
 }
-local NEBULA = { color = "#B98CFF", material = Enum.Material.Neon, transparency = 0.45 }
 local EXPECTED_LENGTH = 58 -- studs, environ
 
 -- 1. Trouver le modèle
@@ -71,12 +70,6 @@ for _, part in ipairs(model:GetDescendants()) do
 			part.Material = seg.material or cfg.material
 			part.CastShadow = cfg.shadow
 			found[seg.like] = found[seg.like] or 0
-		elseif string.sub(part.Name, 1, 6) == "Nebula" then
-			part.Name = "Nebula"
-			part.Color = Color3.fromHex(NEBULA.color)
-			part.Material = NEBULA.material
-			part.Transparency = NEBULA.transparency
-			part.CastShadow = false
 		else
 			for name, cfg in pairs(PARTS) do
 				if part.Name == name or string.find(part.Name, name, 1, true) then

@@ -205,14 +205,14 @@ body {
                Eyes: "#7FF7FF", Pupils: "#1B1406", Mouth: "#8E2529", Tongue: "#C25A5A" },
       glow: { Fins: 0.8, Whiskers: 0.45, Horns: 0.15 }, sparkles: "rise" },
     { id: "mythique", rarity: "Mythique", color: "#ff4fd8", name: "Dragon du Néant", file: "dragon_v19_neant_rig.txt",
-      desc: "Né de la nuit entre les étoiles : une vague de lumière court de ses cornes à sa queue, ses cristaux " +
-            "flottent au-dessus de son dos et sa queue se dissout en nébuleuse. Il garde la perle sacrée devant sa gueule.",
-      points: ["Pulsation : vague de lumière tête → queue", "Cristaux flottants, queue nébuleuse",
+      desc: "Né de la nuit entre les étoiles : son corps noir laisse passer une vague de lumière des cornes à la " +
+            "queue, ses cristaux flottent autour de lui et ses yeux brillent. Il garde la perle sacrée devant sa gueule.",
+      points: ["Pulsation : vague de lumière tête → queue", "Cristaux flottants, yeux qui brillent",
                "Cornes en spirale, couleurs irisées", "Perle sacrée et poussière d'étoiles"],
-      parts: { Body: "#1C1638", Belly: "#6A4BD8", Fins: "#FF4FD8", Horns: "#EDE6FF", Whiskers: "#8FF3FF",
-               Eyes: "#FFFFFF", Pupils: "#2A0A3A", Mouth: "#5A1650", Tongue: "#C04A9A", Nebula: "#B98CFF" },
-      glow: { Fins: 0.9, Whiskers: 0.6, Horns: 0.25, Belly: 0.12, Nebula: 0.6 }, sparkles: "swirl", iris: true, pearl: true,
-      pulse: true }
+      parts: { Body: "#0C0918", Belly: "#2B1F5C", Fins: "#FF4FD8", Horns: "#CFC6E8", Whiskers: "#8FF3FF",
+               Eyes: "#FF3FD8", Pupils: "#12021C", Mouth: "#3A0C34", Tongue: "#A03A82" },
+      glow: { Fins: 0.5, Whiskers: 0.45, Horns: 0.08, Belly: 0.04 }, sparkles: "swirl", iris: true, pearl: true,
+      pulse: true, eyeGlow: 0xff3fd8 }
   ];
 
   const stage = document.getElementById("stage");
@@ -284,12 +284,6 @@ body {
             o.material = o.material.clone();
             o.material.flatShading = true;
             if (part === "Fins" || part === "Whiskers" || part === "Crest") o.material.side = THREE.DoubleSide;
-            if (part === "Nebula") {           // volutes translucides de la queue
-              o.material.transparent = true;
-              o.material.opacity = 0.55;
-              o.material.depthWrite = false;
-              o.material.side = THREE.DoubleSide;
-            }
             o.frustumCulled = false;
             (meshes[part] = meshes[part] || []).push(o);
           }
@@ -299,6 +293,19 @@ body {
           }
         });
         entry.scene = gltf.scene;
+        // Centre de chaque œil dans le repère de son os (pour poser le halo des yeux qui brillent).
+        if (meshes.Eyes && bones.Eye_L && bones.Eye_R) {
+          gltf.scene.updateMatrixWorld(true);
+          const pos = meshes.Eyes[0].geometry.attributes.position, c = [new THREE.Vector3(), new THREE.Vector3()], n = [0, 0];
+          for (let i = 0; i < pos.count; i++) {
+            const side = pos.getX(i) > 0 ? 0 : 1;
+            c[side].x += pos.getX(i); c[side].y += pos.getY(i); c[side].z += pos.getZ(i); n[side]++;
+          }
+          // Le côté +X est-il l'œil gauche ? On compare à la position de l'os.
+          const left = bones.Eye_L.getWorldPosition(new THREE.Vector3()).x > 0 ? 0 : 1;
+          entry.eyeCenter = [bones.Eye_L.worldToLocal(c[left].divideScalar(n[left]).applyMatrix4(meshes.Eyes[0].matrixWorld)),
+                             bones.Eye_R.worldToLocal(c[1 - left].divideScalar(n[1 - left]).applyMatrix4(meshes.Eyes[0].matrixWorld))];
+        }
         entry.meshes = meshes;
         entry.bones = bones;
         entry.anim = DragonAnimator.create(bones, function (name, rx, ry, rz, ty, tz, tx) {
@@ -324,7 +331,7 @@ body {
       entry.meshes[part].forEach(function (o) {
         const m = o.material;
         m.color.set(hex).convertSRGBToLinear();
-        const g = part === "Eyes" ? 1.6 : (r.glow[part] || r.glow[PART_ALIAS[part]] || 0);
+        const g = part === "Eyes" ? (r.eyeGlow ? 1.1 : 1.6) : (r.glow[part] || r.glow[PART_ALIAS[part]] || 0);
         m.emissive.set(hex).convertSRGBToLinear();
         m.emissiveIntensity = g;
       });
@@ -435,6 +442,57 @@ body {
     pearlHalo.scale.setScalar(1 + 0.08 * Math.sin(t * 3));
   }
 
+  // ---------- Yeux qui brillent (Mythique) : une petite lumière dans chaque œil, éclaire les arcades ----------
+  // Halo : un petit disque flou qui s'ajoute à la lumière de la scène (il ne cache rien derrière lui).
+  const haloCanvas = document.createElement("canvas");
+  haloCanvas.width = haloCanvas.height = 64;
+  const hc = haloCanvas.getContext("2d"), grad = hc.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, "rgba(255,255,255,1)");
+  grad.addColorStop(0.25, "rgba(255,255,255,0.55)");
+  grad.addColorStop(1, "rgba(255,255,255,0)");
+  hc.fillStyle = grad;
+  hc.fillRect(0, 0, 64, 64);
+  const haloTex = new THREE.CanvasTexture(haloCanvas);
+  const eyeLights = ["Eye_L", "Eye_R"].map(function () {
+    const l = new THREE.PointLight(0xff3fd8, 0.9, 7, 2);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTex, color: 0xff7ae6, transparent: true,
+      blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false }));
+    halo.scale.setScalar(2.2);
+    l.add(halo);
+    l.userData.halo = halo;
+    l.visible = false;
+    return l;
+  });
+  function attachEyeLights(entry, r) {
+    eyeLights.forEach(function (l, k) {
+      const b = entry.bones[k ? "Eye_R" : "Eye_L"];
+      if (b && r.eyeGlow) {
+        b.add(l);
+        // Halo posé au centre de l'œil.
+        if (entry.eyeCenter) l.userData.halo.position.copy(entry.eyeCenter[k]);
+        l.color.set(r.eyeGlow);
+        l.userData.halo.material.color.set(r.eyeGlow);
+        l.visible = true;
+      }
+      else { l.visible = false; }
+    });
+  }
+
+  // Le halo est dessiné par-dessus tout (l'œil est enfoncé sous l'arcade) : on l'efface quand l'œil ne regarde
+  // pas vers la caméra, sinon on le verrait à travers la tête.
+  const eyeOut = new THREE.Vector3(), eyeTo = new THREE.Vector3(), eyeQ = new THREE.Quaternion();
+  function updateEyeHalos() {
+    eyeLights.forEach(function (l) {
+      if (!l.visible) return;
+      const h = l.userData.halo;
+      h.getWorldPosition(eyeTo);
+      eyeTo.subVectors(camera.position, eyeTo).normalize();
+      eyeOut.set(0, 0, 1).applyQuaternion(l.parent.getWorldQuaternion(eyeQ));
+      const face = THREE.MathUtils.smoothstep(eyeOut.dot(eyeTo), 0.05, 0.35);
+      h.material.opacity = (l.userData.glow || 0.7) * face;
+    });
+  }
+
   // ---------- Couleurs irisées (Mythique) : crête et crinière passent du magenta au violet puis au cyan ----------
   const IRIS = ["#FF4FD8", "#8A5CFF", "#3BE0FF"].map(function (c) { return new THREE.Color(c).convertSRGBToLinear(); });
   const irisCol = new THREE.Color();
@@ -450,20 +508,23 @@ body {
     const anim = entry.anim;
     (entry.meshes.Crest || []).forEach(function (o) {
       const k = anim.pulseAt(o.userData.seg);
-      o.material.color.lerp(pulseWhite, 0.55 * k);           // au passage de la vague, le cristal blanchit…
-      o.material.emissiveIntensity = 0.25 + 2.2 * k;         // … et s'allume
+      o.material.color.multiplyScalar(0.5 + 0.5 * k).lerp(pulseWhite, 0.55 * k);  // sombre au repos, blanchit au passage…
+      o.material.emissiveIntensity = 0.15 + 2.4 * k;                                // … et s'allume
     });
     (entry.meshes.BellyGlow || []).forEach(function (o) {
       const k = anim.pulseAt(o.userData.seg);
       o.material.emissive.copy(pulseLilac);
       o.material.emissiveIntensity = r.glow.Belly + 1.1 * k;
     });
-    (entry.meshes.Horns || []).forEach(function (o) { o.material.emissiveIntensity = r.glow.Horns + 1.2 * anim.pulseAt(0); });
-    (entry.meshes.Nebula || []).forEach(function (o) {
-      o.material.emissiveIntensity = r.glow.Nebula * (0.7 + 0.8 * anim.pulseAt(PULSE_TAIL));
+    const head = anim.pulseAt(0);       // la vague naît dans les cornes et fait briller les yeux plus fort
+    (entry.meshes.Horns || []).forEach(function (o) { o.material.emissiveIntensity = r.glow.Horns + 1.2 * head; });
+    (entry.meshes.Eyes || []).forEach(function (o) { o.material.emissiveIntensity = 1.1 + 1.2 * head; });
+    eyeLights.forEach(function (l) {
+      l.intensity = 0.9 + 1.2 * head;
+      l.userData.glow = 0.85 + 0.15 * head;
+      l.userData.halo.scale.setScalar(2.2 + 1.2 * head);
     });
   }
-  const PULSE_TAIL = 7;   // la nébuleuse s'illumine juste après le dernier tronçon de crête
 
   // ---------- Interface ----------
   const cards = document.getElementById("cards");
@@ -504,6 +565,7 @@ body {
       if (r.sparkles && r.sparkles !== sparkMode) { sparkMode = r.sparkles; sparkLife.fill(0); }
       sparkMat.uniforms.uColor.value.set(r.sparkles === "swirl" ? 0xd7c9ff : 0xffd36b);
       pearl.visible = !!r.pearl;
+      attachEyeLights(entry, r);
       status.hidden = true;
     }).catch(function () {
       status.hidden = false;
@@ -557,6 +619,7 @@ body {
       }
     }
     if (currentEntry && current && current.pulse && !reduceMotion) updatePulse(currentEntry, current);
+    if (current && current.eyeGlow) updateEyeHalos();
     controls.update();
     renderer.render(scene, camera);
     requestAnimationFrame(loop);

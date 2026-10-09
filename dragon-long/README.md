@@ -61,13 +61,13 @@ Pour les nageoires, mettre `DoubleSided = true` si elles disparaissent sous cert
 | Rare | Dragon de Braise | palette feu, crinière et crête lumineuses | même modèle |
 | Épique | Dragon de Glace | crête et queue en cristaux, cornes en couronne, palette glacée | `objets/Dragon_Long_v19_glace_rig.glb` |
 | Légendaire | Dragon Céleste | grands bois à 3 branches, cristaux, palette nacre et or lumineuse, aura d'étincelles | `objets/Dragon_Long_v19_celeste_rig.glb` |
-| Mythique | Dragon du Néant | **pulsation** (vague de lumière des cornes à la queue, plus rapide en vol), **cristaux flottants** au-dessus du dos, **queue nébuleuse** (volutes translucides), cornes en spirale torsadée, palette nuit cosmique, crinière et crête irisées (magenta → violet → cyan), perle sacrée qui flotte devant la gueule, poussière d'étoiles en spirale | `objets/Dragon_Long_v19_neant_rig.glb` |
+| Mythique | Dragon du Néant | **pulsation** (vague de lumière des cornes à la queue, plus rapide en vol), **cristaux flottants** sur le dos, les côtés et le bout de la queue, **yeux qui brillent** (magenta, avec halo), corps presque noir pour faire ressortir la vague, cornes en spirale torsadée, crinière et crête irisées (magenta → violet → cyan), perle sacrée qui flotte devant la gueule, poussière d'étoiles en spirale | `objets/Dragon_Long_v19_neant_rig.glb` |
 
 Les formes spéciales viennent du même générateur (`python build_rig.py glace` / `celeste` / `neant`) avec le même squelette :
 toutes les animations marchent pour toutes les raretés. Les palettes sont dans `demo/raretes.html`.
-Le Mythique a en plus 6 os `Crest1`…`Crest6` (cristaux flottants) et des parties découpées en tronçons
-(`Crest1`…, `BellyGlow1`…, `Nebula`) : `DragonAnimator` fait flotter les cristaux et passer la vague de lumière
-(couleur de chaque tronçon). `setup_dragon_long.lua` garde ces noms tels quels.
+Le Mythique a en plus 8 os `Crest1`…`Crest8` (cristaux flottants) et des parties découpées en tronçons
+(`Crest1`…, `BellyGlow1`…) : `DragonAnimator` fait flotter les cristaux et passer la vague de lumière
+(couleur de chaque tronçon, plus les cornes et les yeux). `setup_dragon_long.lua` garde ces noms tels quels.
 
 ## Animation
 - `generateur/build_rig.py` exporte `objets/Dragon_Long_v19_rig.glb` (même géométrie, plus le squelette et les poids de peau) et `objets/Dragon_Long_v19_rig.json` (liste des os).
