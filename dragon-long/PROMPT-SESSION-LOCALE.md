@@ -37,6 +37,22 @@ Parle en **français**, simplement, et explique ce que tu fais.
 | `Mouth` | intérieur de la gueule : gorge, palais, plancher, intérieur des lèvres | `#8E2529` (rouge) | SmoothPlastic | 684 |
 | `Tongue` | langue | `#B9434C` (rouge rosé) | SmoothPlastic | 192 |
 
+## Les 5 raretés
+Il y a 4 fichiers de forme (tous avec le même squelette) pour 5 raretés :
+| Rareté | Nom | Fichier | Souffle |
+|---|---|---|---|
+| Commun | Dragon de Jade | `Dragon_Long_v19_rig.glb` | feu |
+| Rare | Dragon de Braise | `Dragon_Long_v19_rig.glb` (même forme, autres couleurs) | feu |
+| Épique | Dragon de Glace | `Dragon_Long_v19_glace_rig.glb` | glace |
+| Légendaire | Dragon Céleste | `Dragon_Long_v19_celeste_rig.glb` | or |
+| Mythique | Dragon du Néant | `Dragon_Long_v19_neant_rig.glb` (en plus : crête en tronçons `Crest1…`, `BellyGlow1…`, fissures `Crack1…`, coque `Aura`) | néant |
+
+Après chaque import, lance `setup_dragon_long.lua` (dans la barre de commande, le modèle importé sélectionné) : il devine
+la rareté d'après le nom du fichier (`glace`, `celeste`, `neant`, sinon Commun), applique la bonne palette, règle
+l'attribut `BreathStyle` et range un exemplaire dans `ServerStorage > Dragons > Dragon_Long_<Rareté>`. **Pour le Rare**,
+mets l'attribut `Rarity = "Rare"` sur le modèle importé avant de lancer le script (c'est la même forme que le Commun).
+Ne renomme pas les parties `Crest1`, `BellyGlow1`, `Crack1`… du Mythique : l'animation s'en sert.
+
 ## Import (fait par moi, à la main)
 1. Dans Studio : **Avatar → Import 3D** (ou **Fichier → Import 3D**), puis choisir `Dragon_Long_v19_rig.glb`.
 2. Dans la fenêtre d'import :
@@ -48,7 +64,7 @@ Parle en **français**, simplement, et explique ce que tu fais.
 **Toi, vérifie la taille** avec `GetExtentsSize()` : environ 16,5 × 19 × 58. Si c'est environ 3,5 fois trop grand ou trop petit, c'est l'unité : dis-le-moi pour que je réimporte (le format `.glb` est prévu en mètres). Vérifie aussi que les **9 parties** sont là avec les bons noms. Si Studio les a renommées (par exemple `Body_Mesh`), renomme-les comme dans le tableau.
 
 ## A. Réglages du modèle
-1. Range le modèle dans `ServerStorage > Dragons` (crée le dossier s'il n'existe pas) et nomme-le `Dragon_Long`.
+1. Range le modèle dans `ServerStorage > Dragons` (crée le dossier s'il n'existe pas) et nomme-le `Dragon_Long_<Rareté>` (le script de réglage le fait tout seul).
 2. Pour **chaque partie** : `Color` et `Material` d'après le tableau ci-dessus.
 3. Pour **toutes** les parties :
    - `Anchored = true` ;
@@ -59,7 +75,7 @@ Parle en **français**, simplement, et explique ce que tu fais.
 6. `PrimaryPart` = `Body`. Le pivot doit rester sous le dragon : vérifie avec `GetPivot()`.
 
 ## B. Exemplaire de test
-1. Clone `ServerStorage > Dragons > Dragon_Long` dans `Workspace`, à un endroit dégagé et bien visible (pas sur un chemin), avec `PivotTo`.
+1. Clone `ServerStorage > Dragons > Dragon_Long_Commun` dans `Workspace`, à un endroit dégagé et bien visible (pas sur un chemin), avec `PivotTo`.
 2. Si la taille ne convient pas : `Model:ScaleTo(...)`. Par exemple 0,5 pour un dragon de 29 studs de long.
 3. Prends une **capture de face** et une **capture de profil**, montre-les-moi.
    - Les yeux jaunes doivent briller (Neon) et se voir de face, sous les arcades.
