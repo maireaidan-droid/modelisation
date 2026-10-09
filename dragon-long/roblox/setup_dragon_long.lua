@@ -37,7 +37,10 @@ local PARTS = {
 local SEGMENTS = {
 	Crest     = { like = "Fins", material = Enum.Material.Neon },
 	BellyGlow = { like = "Belly" },
+	Crack     = { color = "#FF3FD8", material = Enum.Material.Neon, shadow = false }, -- fissures de lumière
 }
+-- Aura d'ombre autour du corps (Mythique) : matériau ForceField (scintille tout seul) et particules aspirées.
+local AURA = { color = "#2A1450", material = Enum.Material.ForceField }
 local EXPECTED_LENGTH = 58 -- studs, environ
 
 -- 1. Trouver le modèle
@@ -64,12 +67,35 @@ for _, part in ipairs(model:GetDescendants()) do
 		local kind, num = string.match(part.Name, "^(%a+)(%d+)") -- « Crest3 » ou « Crest3_Mesh » si Studio l'a renommée
 		local seg = SEGMENTS[kind or ""]
 		if seg then
-			local cfg = PARTS[seg.like]
+			local cfg = seg.like and PARTS[seg.like] or seg
 			part.Name = kind .. num
 			part.Color = Color3.fromHex(cfg.color)
 			part.Material = seg.material or cfg.material
 			part.CastShadow = cfg.shadow
-			found[seg.like] = found[seg.like] or 0
+			if seg.like then found[seg.like] = found[seg.like] or 0 end
+		elseif string.sub(part.Name, 1, 4) == "Aura" then
+			part.Name = "Aura"
+			part.Color = Color3.fromHex(AURA.color)
+			part.Material = AURA.material
+			part.CastShadow = false
+			if not part:FindFirstChild("Absorption") then
+				-- Des grains de lumière naissent sur une boîte autour du dragon et sont aspirés vers lui.
+				local fx = Instance.new("ParticleEmitter")
+				fx.Name = "Absorption"
+				fx.Shape = Enum.ParticleEmitterShape.Box
+				fx.ShapeStyle = Enum.ParticleEmitterShapeStyle.Surface
+				fx.ShapeInOut = Enum.ParticleEmitterShapeInOut.Inward
+				fx.Color = ColorSequence.new(Color3.fromHex("#C58BFF"))
+				fx.LightEmission = 1
+				fx.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.15), NumberSequenceKeypoint.new(1, 0.35) })
+				fx.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.3, 0.2),
+					NumberSequenceKeypoint.new(1, 1) })
+				fx.Speed = NumberRange.new(3, 6)
+				fx.Acceleration = Vector3.zero
+				fx.Lifetime = NumberRange.new(1.5, 2.5)
+				fx.Rate = 40
+				fx.Parent = part
+			end
 		else
 			for name, cfg in pairs(PARTS) do
 				if part.Name == name or string.find(part.Name, name, 1, true) then

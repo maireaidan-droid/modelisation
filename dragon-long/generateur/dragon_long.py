@@ -165,6 +165,43 @@ def seg_part(a, prefix, i, color, material="SmoothPlastic"):
     return name
 
 
+def build_void_cracks(a, pts, T, N, B, radii):
+    # Mythique : fines fissures de lumière magenta sur les flancs, entre les écailles, comme si le corps était
+    # craquelé par l'énergie du néant. Découpées en tronçons (Crack1…8) pour s'allumer au passage de la vague.
+    rng = np.random.default_rng(11)
+    n = len(pts)
+    for x0 in np.arange(7, n - 8, 2.6):
+        side = 1 if rng.random() < 0.5 else -1
+        ang = np.pi / 2 + side * rng.uniform(0.75, 1.45)      # flanc gauche ou droit, ni la crête ni le ventre
+        part = seg_part(a, "Crack", int(x0), "#FF3FD8", "Neon")
+        line, x, up = [], x0, None
+        for _ in range(6):
+            c, o, t, r = surface(pts, T, N, B, radii, x, ang, 1.09)
+            line.append(c)
+            up = o if up is None else up
+            x += rng.uniform(0.45, 0.75)
+            ang += rng.normal(0, 0.16)                        # zigzag
+        w = 0.06 + 0.02 * radii[int(x0)]
+        a.add(part, *tube(line, [w * 0.4] + [w] * 4 + [0.0], 3, flat=0.45, up=up))
+        if rng.random() < 0.5:                                # petite branche
+            j = int(rng.integers(1, 4))
+            c, o, t, r = surface(pts, T, N, B, radii, x0 + 1.2, ang + side * 0.35, 1.09)
+            a.add(part, *tube([line[j], (line[j] + c) / 2 + o * 0.03, c], [w * 0.8, w * 0.6, 0.0], 3, flat=0.45, up=up))
+
+
+def build_aura(a, pts, T, N, B, radii):
+    # Mythique : voile d'ombre translucide autour du corps (coque gonflée qui suit la colonne et ondule avec elle).
+    a.part("Aura", "#2A1450", "ForceField")
+    n = len(pts)
+    rings = []
+    for i in range(2, n):
+        q = (i - 2) / (n - 3)
+        grow = min(1.0, (i - 2) / 6)                          # s'ouvre derrière la tête, se referme au bout
+        r = radii[i] * (1.15 + 0.45 * grow) + 0.35 * grow * (1 - q)
+        rings.append(ellipse_ring(pts[i], B[i], N[i], r * 1.08, r * 0.95, 10))
+    a.add("Aura", *loft(rings))
+
+
 def build_floating_crest(a, pts, T, N, B, radii):
     # Mythique : les cristaux de la crête flottent au-dessus du dos, en 8 tronçons qui ont chacun leur os
     # (ils montent et descendent doucement, et la vague de lumière les allume l'un après l'autre).
@@ -1137,7 +1174,7 @@ VARIANTS = {
     "": {},                                                   # forme de base : bois de cerf, crête en flammes
     "glace": {"horns": "couronne", "crest": "cristaux"},      # Épique
     "celeste": {"horns": "grands_bois", "crest": "cristaux"},  # Légendaire
-    "neant": {"horns": "spirale", "crest": "cristaux_flottants", "pulse": True},  # Mythique
+    "neant": {"horns": "spirale", "crest": "cristaux_flottants", "pulse": True, "cracks": True, "aura": True},  # Mythique
 }
 
 
@@ -1163,6 +1200,10 @@ def build(variant=""):
     build_scales(a, pts, T, N, B, radii)
     build_belly_plates(a, pts, T, N, B, radii)
     build_spines(a, pts, T, N, B, radii)
+    if a.style.get("cracks"):
+        build_void_cracks(a, pts, T, N, B, radii)
+    if a.style.get("aura"):
+        build_aura(a, pts, T, N, B, radii)
     build_legs(a, pts, T, N, B, radii)
     build_head(a, pts[0], radii[0])
     return a

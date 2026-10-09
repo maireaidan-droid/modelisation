@@ -1,6 +1,6 @@
 {
   "name": "Dragon_Long_v19_neant_rig",
-  "tris": 29278,
+  "tris": 31494,
   "bones": [
     "Root",
     "Neck2",
@@ -247,6 +247,51 @@
       "tris": 288,
       "color": "#C8432F",
       "material": "SmoothPlastic"
+    },
+    "Crack1": {
+      "tris": 84,
+      "color": "#FF3FD8",
+      "material": "Neon"
+    },
+    "Crack2": {
+      "tris": 114,
+      "color": "#FF3FD8",
+      "material": "Neon"
+    },
+    "Crack3": {
+      "tris": 144,
+      "color": "#FF3FD8",
+      "material": "Neon"
+    },
+    "Crack4": {
+      "tris": 126,
+      "color": "#FF3FD8",
+      "material": "Neon"
+    },
+    "Crack5": {
+      "tris": 102,
+      "color": "#FF3FD8",
+      "material": "Neon"
+    },
+    "Crack6": {
+      "tris": 114,
+      "color": "#FF3FD8",
+      "material": "Neon"
+    },
+    "Crack7": {
+      "tris": 90,
+      "color": "#FF3FD8",
+      "material": "Neon"
+    },
+    "Crack8": {
+      "tris": 42,
+      "color": "#FF3FD8",
+      "material": "Neon"
+    },
+    "Aura": {
+      "tris": 1400,
+      "color": "#2A1450",
+      "material": "ForceField"
     }
   }
 }

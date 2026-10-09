@@ -19,7 +19,7 @@ Ce qui est animé :
   - crinière, moustaches, barbichette : flottent, plus fort en vol ;
   - pattes : marche en diagonale, repliées vers l'arrière en vol ;
   - Mythique (Dragon_Long_v19_neant_rig) : les cristaux flottants (os Crest1 à Crest8) montent et descendent,
-    et une vague de lumière court des cornes à la queue (parties Crest1…, BellyGlow1…, Horns, Eyes).
+    et une vague de lumière court des cornes à la queue (parties Crest1…, Crack1…, BellyGlow1…, Horns, Eyes).
     Les autres dragons n'ont pas ces os ni ces parties : rien ne se passe pour eux.
 ]]
 
@@ -92,6 +92,8 @@ local function collectGlow(model)
 			if kind == "Crest" then
 				mythic = true
 				table.insert(list, { d, tonumber(n), d.Color, WHITE, 0.55 })
+			elseif kind == "Crack" then
+				table.insert(list, { d, tonumber(n), d.Color, WHITE, 0.6 })
 			elseif kind == "BellyGlow" then
 				table.insert(list, { d, tonumber(n), d.Color, LILAC, 0.7 })
 			elseif d.Name == "Horns" then
