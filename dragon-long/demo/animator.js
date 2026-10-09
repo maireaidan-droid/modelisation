@@ -34,7 +34,8 @@
   };
 
   // Actions ponctuelles (lancées par play(nom)) : durée en secondes.
-  const ACTIONS = { Roar: 2.4, Bite: 0.9, Breath: 3.2 };
+  const ACTIONS = { Roar: 3.3, Bite: 0.9, Breath: 3.2 };
+  const ROAR_BURST = 0.62;   // instant du cri (onde de choc, tremblement de la caméra)
   const TURN_CURVE = 0.027;  // courbure du corps (rad par pas de colonne) pour 1 rad/s de virage
   const DEAD_DROP = 3.6;     // le dragon couché sur le flanc : le poitrail descend de tant de studs
   const MID = 34;            // milieu du corps (pas de colonne) : le corps se courbe autour de ce point
@@ -46,16 +47,34 @@
 
   // Pose d'une action à l'instant t : rear = cou dressé (rad), pitch / yaw = tête en plus (rad), jaw = gueule,
   // push = poitrail en avant / en arrière (studs), lift = poitrail plus haut, mane = crinière hérissée,
-  // lash = queue qui fouette, breath = souffle (0 à 1, pour les particules).
+  // lash = queue qui fouette, breath = souffle (0 à 1, pour les particules), cry = force du cri (0 à 1),
+  // shiver = frisson qui parcourt le corps, eyes = yeux grands ouverts (0 à 1), sweep = moustaches plaquées.
   function actionPose(name, t) {
-    const o = { rear: 0, pitch: 0, yaw: 0, jaw: 0, push: 0, lift: 0, mane: 0, lash: 0, breath: 0 };
+    const o = { rear: 0, pitch: 0, yaw: 0, jaw: 0, push: 0, lift: 0, mane: 0, lash: 0, breath: 0,
+                cry: 0, shiver: 0, eyes: 0, sweep: 0 };
     if (name === "Roar") {
-      // Se dresse, ouvre grand la gueule, secoue la tête, crinière hérissée, queue qui fouette.
-      const w = ramp(t, 0, 0.45) * (1 - ramp(t, 1.9, 2.4));
-      const open = ramp(t, 0.35, 0.6) * (1 - ramp(t, 1.8, 2.2));
-      const shake = ramp(t, 0.6, 0.8) * (1 - ramp(t, 1.5, 1.8));
-      o.rear = 0.55 * w; o.pitch = -0.35 * open; o.jaw = 0.95 * open; o.yaw = 0.13 * Math.sin(t * 30) * shake;
-      o.lift = 0.5 * w; o.mane = 0.7 * w; o.lash = 0.1 * w;
+      // 1. Se ramasse : tête basse, poitrail en arrière, gueule fermée.
+      const crouch = ramp(t, 0, 0.45) * (1 - ramp(t, 0.5, 0.65));
+      // 2. Explose : cou dressé, tête projetée en avant vers l'ennemi, gueule grande ouverte.
+      const cry = ramp(t, 0.5, 0.68) * (1 - ramp(t, 2.1, 2.7));
+      const high = ramp(t, 0.5, 0.7) * (1 - ramp(t, 2.6, 3.3));     // garde la tête haute un moment après
+      // 3. Secousse forte au début qui s'amortit.
+      const k = Math.max(0, t - 0.68);
+      const shake = 0.2 * Math.exp(-k * 2.6) * Math.sin(k * 24) * cry;
+      // 4. Petit souffle par les narines à la fin : la tête donne un coup sec.
+      const snort = ramp(t, 2.85, 2.92) * (1 - ramp(t, 2.95, 3.15));
+      o.rear = -0.3 * crouch + 0.4 * high;
+      o.pitch = 0.22 * crouch + 0.08 * cry - 0.12 * high * (1 - cry) + 0.1 * snort;
+      o.push = -0.8 * crouch + 1.1 * cry;
+      o.lift = -0.5 * crouch + 0.35 * high;
+      o.jaw = 1.0 * cry;
+      o.yaw = shake;
+      o.mane = 0.8 * cry + 0.2 * high;
+      o.lash = 0.12 * cry;
+      o.cry = cry;
+      o.shiver = 0.035 * cry;
+      o.eyes = cry;
+      o.sweep = cry;
     } else if (name === "Bite") {
       // Recule la tête, gueule ouverte, puis frappe vers l'avant et claque la mâchoire.
       const wind = ramp(t, 0, 0.3) * (1 - ramp(t, 0.3, 0.42));
@@ -103,7 +122,7 @@
     // setBone(name, rx, ry, rz, ty, tz, tx) : rotation (X puis Y puis Z, comme CFrame.Angles) + décalage
     // le long des axes de l'os
     const st = { p: Object.assign({}, MODES.Idle), phase: 0, step: 0, flutter: 0, pulse: 0, t: 0,
-      action: null, actionT: 0, breath: 0, turn: 0, deadT: 0,
+      action: null, actionT: 0, breath: 0, cry: 0, burst: false, turn: 0, deadT: 0,
       blinkIn: 2, blink: null, headLook: 0, headTarget: 0,
       gazeX: 0, gazeY: 0, gazeTx: 0, gazeTy: 0, gazeIn: 1, microX: 0, microY: 0, microIn: 0.5 };
     function rnd(a, b) { return a + Math.random() * (b - a); }
@@ -146,6 +165,9 @@
         else act = actionPose(st.action, st.actionT);
       }
       st.breath = act.breath;
+      st.cry = act.cry;
+      // Instant du cri (pour l'onde de choc et le tremblement de la caméra) : vrai pendant une seule image.
+      st.burst = st.action === "Roar" && st.actionT >= ROAR_BURST && st.actionT - dt < ROAR_BURST;
       const d = p.dead;
       // Frisson quand il tombe : une dernière vague rapide qui s'éteint.
       const shiver = 0.1 * Math.sin(st.deadT * 16) * Math.exp(-st.deadT * 2.2) * d;
@@ -163,7 +185,9 @@
         // le corps en croissant sur le sol.
         a[0] += -act.rear * front + 0.022 * d * (14 - sp);       // nul au poitrail : le corps ne bascule pas
         a[1] += TURN_CURVE * st.turn * (MID - sp) * (1 - d) + shiver * Math.sin(sp * 0.3)
-              + act.lash * ramp(sp, 30, 60) * Math.sin(st.t * 9 - sp * 0.15);
+              + act.lash * ramp(sp, 30, 60) * Math.sin(st.t * 9 - sp * 0.15)
+              + act.shiver * Math.sin(st.t * 38 - sp * 0.4)                // frisson du cri, de la tête à la queue
+              + act.yaw * 0.5 * front;                                     // le cou suit la secousse de la tête
       });
 
       // 2. Recentrage : position (haut/bas, côté) de chaque articulation par rapport au poitrail.
@@ -246,8 +270,9 @@
         lidR = closure(b, b.t - 0.015, one);
         if (b.t > total + 0.05) st.blink = null;
       }
-      lidL = Math.max(lidL, d);                    // mort : yeux fermés
-      lidR = Math.max(lidR, d);
+      // Mort : yeux fermés ; rugissement : paupières remontées, yeux grands ouverts.
+      lidL = lidL * (1 - d) + d - 0.12 * act.eyes;
+      lidR = lidR * (1 - d) + d - 0.12 * act.eyes;
       setBone("Lid_L", BLINK_UP * lidL, 0, 0, 0, 0);
       setBone("Lid_R", BLINK_UP * lidR, 0, 0, 0, 0);
       setBone("LidLow_L", -BLINK_LOW * Math.max(0, lidL), 0, 0, 0, 0);
@@ -266,9 +291,11 @@
       setBone("Mane_Top", lift + drag + 0.5 * m * Math.sin(f), dragY + m * Math.sin(f * 1.3 + 1), 0, 0, 0);
       setBone("Mane_L", lift + drag + 0.6 * m * Math.sin(f + 2), dragY + m * Math.sin(f * 1.1 + 0.5), 0, 0, 0);
       setBone("Mane_R", lift + drag + 0.6 * m * Math.sin(f + 2.6), dragY - m * Math.sin(f * 1.1 + 1.2), 0, 0, 0);
-      setBone("Whisker_L", 0.8 * m * Math.sin(f * 0.9) + drag, m * Math.sin(f * 0.7 + 0.3) + dragY, 0, 0, 0);
-      setBone("Whisker_R", 0.8 * m * Math.sin(f * 0.9 + 1) + drag, -m * Math.sin(f * 0.7 + 1.1) + dragY, 0, 0, 0);
-      setBone("Beard", 0.5 * m * Math.sin(f * 0.8) + drag, 0.4 * m * Math.sin(f * 1.2), 0, 0, 0);
+      // Rugissement : moustaches et barbichette plaquées vers l'arrière par le souffle du cri.
+      const sweep = -0.6 * act.sweep;
+      setBone("Whisker_L", 0.8 * m * Math.sin(f * 0.9) + drag + sweep, m * Math.sin(f * 0.7 + 0.3) + dragY, 0, 0, 0);
+      setBone("Whisker_R", 0.8 * m * Math.sin(f * 0.9 + 1) + drag + sweep, -m * Math.sin(f * 0.7 + 1.1) + dragY, 0, 0, 0);
+      setBone("Beard", 0.5 * m * Math.sin(f * 0.8) + drag - 0.4 * act.sweep, 0.4 * m * Math.sin(f * 1.2), 0, 0, 0);
 
       // Cristaux flottants (Mythique, os Crest1 à Crest8) : montent et descendent doucement, et se soulèvent
       // un peu quand la vague de lumière passe. Les autres dragons n'ont pas ces os : rien ne se passe.

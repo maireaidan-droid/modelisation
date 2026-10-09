@@ -19,7 +19,8 @@ Ce qui est animé :
   - crinière, moustaches, barbichette : flottent, plus fort en vol ;
   - pattes : marche en diagonale, repliées vers l'arrière en vol ;
   - actions (attribut « Action » du Model, réglé par un script serveur) : "Roar" (rugissement), "Bite" (morsure),
-    "Breath" (souffle, avec des particules qui sortent de la gueule). Pour relancer la même action, ajoute un
+    "Breath" (souffle, avec des particules qui sortent de la gueule). Le rugissement lance une onde de choc et fait
+    trembler la caméra des joueurs proches. Pour relancer la même action, ajoute un
     numéro après un # : "Roar#1", "Roar#2"… Style du souffle : attribut « BreathStyle » = "fire" (par défaut),
     "ice", "gold" ou "void" ;
   - virages : calculés tout seuls d'après la rotation du Model ; le corps se courbe dans le virage, la tête
@@ -32,7 +33,6 @@ Ce qui est animé :
 
 local RunService = game:GetService("RunService")
 local CollectionService = game:GetService("CollectionService")
-local Players = game:GetService("Players")
 
 local TAG = "DragonLong"
 local MAX_DISTANCE = 400 -- au-delà, on n'anime pas (économie)
@@ -63,7 +63,8 @@ local MODES = {
 }
 
 -- Actions ponctuelles : durée en secondes.
-local ACTIONS = { Roar = 2.4, Bite = 0.9, Breath = 3.2 }
+local ACTIONS = { Roar = 3.3, Bite = 0.9, Breath = 3.2 }
+local ROAR_BURST = 0.62  -- instant du cri (onde de choc, tremblement de la caméra)
 local TURN_CURVE = 0.027 -- courbure du corps (rad par pas de colonne) pour 1 rad/s de virage
 local DEAD_DROP = 3.6    -- le dragon couché sur le flanc : le poitrail descend de tant de studs
 local MID = 34           -- milieu du corps (pas de colonne) : le corps se courbe autour de ce point
@@ -81,14 +82,26 @@ end
 
 -- Pose d'une action à l'instant t (voir demo/animator.js, même calcul).
 local function actionPose(name, t)
-	local o = { rear = 0, pitch = 0, yaw = 0, jaw = 0, push = 0, lift = 0, mane = 0, lash = 0, breath = 0 }
+	local o = { rear = 0, pitch = 0, yaw = 0, jaw = 0, push = 0, lift = 0, mane = 0, lash = 0, breath = 0,
+		cry = 0, shiver = 0, eyes = 0, sweep = 0 }
 	if name == "Roar" then
-		-- Se dresse, ouvre grand la gueule, secoue la tête, crinière hérissée, queue qui fouette.
-		local w = ramp(t, 0, 0.45) * (1 - ramp(t, 1.9, 2.4))
-		local open = ramp(t, 0.35, 0.6) * (1 - ramp(t, 1.8, 2.2))
-		local shake = ramp(t, 0.6, 0.8) * (1 - ramp(t, 1.5, 1.8))
-		o.rear, o.pitch, o.jaw, o.yaw = 0.55 * w, -0.35 * open, 0.95 * open, 0.13 * math.sin(t * 30) * shake
-		o.lift, o.mane, o.lash = 0.5 * w, 0.7 * w, 0.1 * w
+		-- 1. Se ramasse : tête basse, poitrail en arrière, gueule fermée.
+		local crouch = ramp(t, 0, 0.45) * (1 - ramp(t, 0.5, 0.65))
+		-- 2. Explose : cou dressé, tête projetée en avant vers l'ennemi, gueule grande ouverte.
+		local cry = ramp(t, 0.5, 0.68) * (1 - ramp(t, 2.1, 2.7))
+		local high = ramp(t, 0.5, 0.7) * (1 - ramp(t, 2.6, 3.3)) -- garde la tête haute un moment après
+		-- 3. Secousse forte au début qui s'amortit.
+		local k = math.max(0, t - 0.68)
+		local shake = 0.2 * math.exp(-k * 2.6) * math.sin(k * 24) * cry
+		-- 4. Petit souffle par les narines à la fin : la tête donne un coup sec.
+		local snort = ramp(t, 2.85, 2.92) * (1 - ramp(t, 2.95, 3.15))
+		o.rear = -0.3 * crouch + 0.4 * high
+		o.pitch = 0.22 * crouch + 0.08 * cry - 0.12 * high * (1 - cry) + 0.1 * snort
+		o.push = -0.8 * crouch + 1.1 * cry
+		o.lift = -0.5 * crouch + 0.35 * high
+		o.jaw, o.yaw = 1.0 * cry, shake
+		o.mane, o.lash = 0.8 * cry + 0.2 * high, 0.12 * cry
+		o.cry, o.shiver, o.eyes, o.sweep = cry, 0.035 * cry, cry, cry
 	elseif name == "Bite" then
 		-- Recule la tête, gueule ouverte, puis frappe vers l'avant et claque la mâchoire.
 		local wind = ramp(t, 0, 0.3) * (1 - ramp(t, 0.3, 0.42))
@@ -171,7 +184,7 @@ local function newState(model)
 	return {
 		model = model, bones = collectBones(model), glow = collectGlow(model), p = p,
 		phase = rng:NextNumber(0, 6), step = 0, flutter = 0, pulse = 0, t = 0,
-		action = nil, actionT = 0, breath = 0, turn = 0, deadT = 0, yaw = nil,
+		action = nil, actionT = 0, breath = 0, cry = 0, burst = false, turn = 0, deadT = 0, yaw = nil,
 		blinkIn = rng:NextNumber(1, 4), blink = nil,
 		headLook = 0, headTarget = 0,
 		gazeX = 0, gazeY = 0, gazeTx = 0, gazeTy = 0, gazeIn = 1, microX = 0, microY = 0, microIn = 0.5,
@@ -277,6 +290,9 @@ local function update(st, dt, turn)
 		end
 	end
 	st.breath = act.breath
+	st.cry = act.cry
+	-- Instant du cri (onde de choc, tremblement de la caméra) : vrai pendant une seule image.
+	st.burst = st.action == "Roar" and st.actionT >= ROAR_BURST and st.actionT - dt < ROAR_BURST
 	local d = p.dead
 	-- Frisson quand il tombe : une dernière vague rapide qui s'éteint.
 	local shiver = 0.1 * math.sin(st.deadT * 16) * math.exp(-st.deadT * 2.2) * d
@@ -297,6 +313,8 @@ local function update(st, dt, turn)
 		ax[name] += -act.rear * front + 0.022 * d * (14 - sp)
 		ay[name] += TURN_CURVE * st.turn * (MID - sp) * (1 - d) + shiver * math.sin(sp * 0.3)
 			+ act.lash * ramp(sp, 30, 60) * math.sin(st.t * 9 - sp * 0.15)
+			+ act.shiver * math.sin(st.t * 38 - sp * 0.4) -- frisson du cri, de la tête à la queue
+			+ act.yaw * 0.5 * front -- le cou suit la secousse de la tête
 	end
 
 	-- 2. Recentrage : position (haut/bas, côté) de chaque articulation par rapport au poitrail.
@@ -385,7 +403,9 @@ local function update(st, dt, turn)
 			st.blink = nil
 		end
 	end
-	lidL, lidR = math.max(lidL, d), math.max(lidR, d) -- mort : yeux fermés
+	-- Mort : yeux fermés ; rugissement : paupières remontées, yeux grands ouverts.
+	lidL = lidL * (1 - d) + d - 0.12 * act.eyes
+	lidR = lidR * (1 - d) + d - 0.12 * act.eyes
 	setBone(st, "Lid_L", BLINK_UP * lidL, 0, 0)
 	setBone(st, "Lid_R", BLINK_UP * lidR, 0, 0)
 	setBone(st, "LidLow_L", -BLINK_LOW * math.max(0, lidL), 0, 0)
@@ -405,9 +425,11 @@ local function update(st, dt, turn)
 	setBone(st, "Mane_Top", lift + drag + 0.5 * m * math.sin(f), dragY + m * math.sin(f * 1.3 + 1), 0)
 	setBone(st, "Mane_L", lift + drag + 0.6 * m * math.sin(f + 2), dragY + m * math.sin(f * 1.1 + 0.5), 0)
 	setBone(st, "Mane_R", lift + drag + 0.6 * m * math.sin(f + 2.6), dragY - m * math.sin(f * 1.1 + 1.2), 0)
-	setBone(st, "Whisker_L", 0.8 * m * math.sin(f * 0.9) + drag, m * math.sin(f * 0.7 + 0.3) + dragY, 0)
-	setBone(st, "Whisker_R", 0.8 * m * math.sin(f * 0.9 + 1) + drag, -m * math.sin(f * 0.7 + 1.1) + dragY, 0)
-	setBone(st, "Beard", 0.5 * m * math.sin(f * 0.8) + drag, 0.4 * m * math.sin(f * 1.2), 0)
+	-- Rugissement : moustaches et barbichette plaquées vers l'arrière par le souffle du cri.
+	local sweep = -0.6 * act.sweep
+	setBone(st, "Whisker_L", 0.8 * m * math.sin(f * 0.9) + drag + sweep, m * math.sin(f * 0.7 + 0.3) + dragY, 0)
+	setBone(st, "Whisker_R", 0.8 * m * math.sin(f * 0.9 + 1) + drag + sweep, -m * math.sin(f * 0.7 + 1.1) + dragY, 0)
+	setBone(st, "Beard", 0.5 * m * math.sin(f * 0.8) + drag - 0.4 * act.sweep, 0.4 * m * math.sin(f * 1.2), 0)
 
 	-- Cristaux flottants (Mythique) : montent et descendent doucement, et se soulèvent un peu quand la vague passe.
 	for c = 1, PULSE_SEGMENTS do
@@ -471,6 +493,84 @@ local function updateBreath(st)
 	fx.Enabled = st.breath > 0.02
 end
 
+-- Rugissement : onde de choc (3 anneaux de petits blocs lumineux qui partent de la gueule et s'agrandissent)
+-- et tremblement de la caméra du joueur s'il est assez près. Tout est créé chez le joueur seulement.
+local SHOCK_COLORS = { fire = "#FFB070", ice = "#9FEFFF", gold = "#FFE08A", void = "#FF6FE4" }
+local SHOCK_PIECES = 16
+local shocks = {}
+local shake = { t = 99, strength = 0 }
+
+local function startRoarFx(st)
+	local head = st.bones.Head and st.bones.Head[1]
+	local jaw = st.bones.Jaw and st.bones.Jaw[1]
+	if not head then
+		return
+	end
+	local cf = head.WorldCFrame
+	local fwd = -cf.LookVector -- l'avant de la tête est le +Z de l'os
+	local origin = (jaw and jaw.WorldPosition or cf.Position) + fwd * 2
+	local color = Color3.fromHex(SHOCK_COLORS[st.model:GetAttribute("BreathStyle") or "fire"] or SHOCK_COLORS.fire)
+	local right = fwd:Cross(Vector3.yAxis)
+	right = right.Magnitude > 0.01 and right.Unit or Vector3.xAxis
+	local up = right:Cross(fwd).Unit
+	for k = 0, 2 do
+		local ring = { t = -0.13 * k, center = origin, fwd = fwd, right = right, up = up, parts = {} }
+		for i = 1, SHOCK_PIECES do
+			local part = Instance.new("Part")
+			part.Anchored, part.CanCollide, part.CanQuery, part.CanTouch, part.CastShadow = true, false, false, false, false
+			part.Material = Enum.Material.Neon
+			part.Color = color
+			part.Transparency = 1
+			part.Size = Vector3.new(0.3, 0.3, 0.3)
+			part.Parent = workspace
+			ring.parts[i] = part
+		end
+		table.insert(shocks, ring)
+	end
+	-- La caméra tremble d'autant plus que le joueur est proche.
+	local cam = workspace.CurrentCamera
+	if cam then
+		local dist = (cam.CFrame.Position - origin).Magnitude
+		shake.t, shake.strength = 0, 0.9 * math.clamp(1 - dist / 90, 0, 1)
+	end
+end
+
+local function updateShocks(dt)
+	for idx = #shocks, 1, -1 do
+		local ring = shocks[idx]
+		ring.t += dt
+		local q = ring.t / 0.95
+		if q >= 1 then
+			for _, part in ipairs(ring.parts) do
+				part:Destroy()
+			end
+			table.remove(shocks, idx)
+		elseif q > 0 then
+			ring.center += ring.fwd * 9 * dt
+			local radius = 1 + 18 * (1 - (1 - q) ^ 3) -- s'ouvre vite puis ralentit
+			local len = 2 * math.pi * radius / SHOCK_PIECES * 0.8
+			for i, part in ipairs(ring.parts) do
+				local a = (i - 1) / SHOCK_PIECES * 2 * math.pi
+				local dir = ring.right * math.cos(a) + ring.up * math.sin(a)
+				local tangent = ring.up * math.cos(a) - ring.right * math.sin(a)
+				local pos = ring.center + dir * radius
+				part.Size = Vector3.new(0.35, 0.35, len)
+				part.CFrame = CFrame.lookAt(pos, pos + tangent)
+				part.Transparency = 1 - 0.6 * (1 - q) ^ 2
+			end
+		end
+	end
+end
+
+RunService:BindToRenderStep("DragonRoarShake", Enum.RenderPriority.Camera.Value + 1, function(dt)
+	shake.t += dt
+	local cam = workspace.CurrentCamera
+	if cam and shake.t < 1.2 and shake.strength > 0 then
+		local a = shake.strength * math.exp(-shake.t * 4)
+		cam.CFrame *= CFrame.new(rng:NextNumber(-a, a), rng:NextNumber(-a, a), rng:NextNumber(-a, a) * 0.5)
+	end
+end)
+
 local function track(model)
 	if model:IsA("Model") and not dragons[model] then
 		dragons[model] = newState(model)
@@ -513,6 +613,7 @@ end)
 
 RunService.RenderStepped:Connect(function(dt)
 	dt = math.min(dt, 0.1)
+	updateShocks(dt)
 	local cam = workspace.CurrentCamera
 	for model, st in pairs(dragons) do
 		if not model:IsDescendantOf(workspace) then
@@ -520,6 +621,9 @@ RunService.RenderStepped:Connect(function(dt)
 		elseif cam and (model:GetPivot().Position - cam.CFrame.Position).Magnitude < MAX_DISTANCE then
 			update(st, dt, turnRate(st, dt))
 			updateBreath(st)
+			if st.burst then
+				startRoarFx(st)
+			end
 		else
 			st.yaw = nil -- trop loin : on repartira de zéro pour le calcul du virage
 		end

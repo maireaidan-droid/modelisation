@@ -207,6 +207,8 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
   let anim = null, mouth = null;
   // Souffle de feu : particules qui sortent de la gueule pendant l'action « Souffle ».
   const breath = DragonEffects.createBreath(THREE, scene);
+  const shock = DragonEffects.createShockwave(THREE, scene), shake = DragonEffects.createShake();
+  const shakeOff = new THREE.Vector3();
   const mouthW = new THREE.Vector3(), headQ = new THREE.Quaternion(), breathDir = new THREE.Vector3();
   function setBone(name, rx, ry, rz, ty, tz, tx) {
     const b = bones[name];
@@ -342,6 +344,11 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
         bones.Head.getWorldQuaternion(headQ);
         breathDir.set(0, -0.12, 1).applyQuaternion(headQ).normalize();
         breath.update(reduceMotion ? 0 : dt, anim.state.breath, mouthW, breathDir);
+        // Rugissement : onde de choc et tremblement de la caméra à l'instant du cri.
+        if (anim.state.burst && !reduceMotion) {
+          shock.trigger(mouthW, breathDir, "#FFB070");
+          shake.trigger(0.9);
+        }
       }
     }
     pivot.position.copy(pathPos);
@@ -359,7 +366,11 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
       if (tween.t >= 1) tween = null;
     }
     controls.update();
+    shock.update(reduceMotion ? 0 : dt);
+    shake.offset(dt, shakeOff);                // la caméra tremble un instant, puis revient à sa place
+    camera.position.add(shakeOff);
     renderer.render(scene, camera);
+    camera.position.sub(shakeOff);
     requestAnimationFrame(loop);
   }
   loop();

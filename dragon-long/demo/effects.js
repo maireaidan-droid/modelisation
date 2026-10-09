@@ -94,5 +94,58 @@
     return head.worldToLocal(best.applyMatrix4(tongue.matrixWorld)).add(new THREE.Vector3(0, 0, 0.8));
   }
 
-  global.DragonEffects = { createBreath: createBreath, mouthInHead: mouthInHead, PRESETS: PRESETS };
+  // Onde de choc du rugissement : trois anneaux qui partent de la gueule, s'agrandissent et s'effacent.
+  function createShockwave(THREE, scene) {
+    const rings = [];
+    for (let k = 0; k < 3; k++) {
+      const m = new THREE.Mesh(new THREE.RingGeometry(0.94, 1, 64), new THREE.MeshBasicMaterial({
+        transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+      m.visible = false;
+      m.userData.t = 99;
+      scene.add(m);
+      rings.push(m);
+    }
+    const look = new THREE.Vector3();
+    return {
+      // origin : bout de la gueule, dir : direction du cri, color : couleur des anneaux
+      trigger: function (origin, dir, color) {
+        rings.forEach(function (m, k) {
+          m.position.copy(origin).addScaledVector(dir, 1.5);
+          m.lookAt(look.copy(m.position).add(dir));
+          m.material.color.set(color).convertSRGBToLinear();
+          m.userData.t = -0.13 * k;                   // les anneaux partent l'un après l'autre
+          m.userData.dir = dir.clone();
+        });
+      },
+      update: function (dt) {
+        rings.forEach(function (m) {
+          m.userData.t += dt;
+          const q = m.userData.t / 0.95;
+          m.visible = q > 0 && q < 1;
+          if (!m.visible) return;
+          const e = 1 - Math.pow(1 - q, 3);           // s'ouvre vite puis ralentit
+          m.scale.setScalar(1 + 18 * e);
+          m.position.addScaledVector(m.userData.dir, dt * 9);
+          m.material.opacity = 0.6 * (1 - q) * (1 - q);
+        });
+      }
+    };
+  }
+
+  // Tremblement de la caméra : décalage aléatoire qui s'éteint. strength = force au départ (studs).
+  function createShake() {
+    let t = 99, strength = 0;
+    return {
+      trigger: function (s) { t = 0; strength = s; },
+      // Renvoie le décalage à ajouter à la caméra pour cette image (0 quand c'est fini).
+      offset: function (dt, out) {
+        t += dt;
+        const a = strength * Math.exp(-t * 4) * (t < 1.2 ? 1 : 0);
+        return out.set((Math.random() - 0.5) * a, (Math.random() - 0.5) * a, (Math.random() - 0.5) * a);
+      }
+    };
+  }
+
+  global.DragonEffects = { createBreath: createBreath, createShockwave: createShockwave, createShake: createShake,
+                           mouthInHead: mouthInHead, PRESETS: PRESETS };
 })(window);
