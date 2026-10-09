@@ -1,12 +1,13 @@
 # Dragon Long v19 (animé) : import dans Roblox Studio (instructions pour une session Claude locale)
 
 > **À coller tel quel dans une NOUVELLE conversation Claude locale** (connectée à Roblox Studio par MCP),
-> après avoir importé le fichier `Dragon_Long_v19_rig.glb` (voir « Import »).
+> après avoir importé le fichier `Dragon_Long_v19_rig.glb` (voir « Import »). Tous les fichiers sont dans
+> `dragon-long-v19.zip` (dossiers `modeles/` et `roblox/`).
 
 ---
 
 ## Contexte
-Tu m'aides à intégrer un **dragon chinois (Long)** dans mon jeu Roblox. C'est un modèle low-poly à facettes, généré par code, en **un seul fichier `.glb` découpé en 9 parties** (une par couleur). Il a un **squelette de 45 os** : un script (`DragonAnimator`) le fait onduler, cligner des yeux, voler, rugir, mordre, souffler et mourir.
+Tu m'aides à intégrer un **dragon chinois (Long)** dans mon jeu Roblox. C'est un modèle low-poly à facettes, généré par code, en **un seul fichier `.glb` découpé en 9 parties** (une par couleur). Il a un **squelette de 45 os** (53 pour le Mythique, qui a en plus les os `Crest1`…`Crest8` de ses cristaux flottants) : un script (`DragonAnimator`) le fait onduler, cligner des yeux, voler, rugir, mordre, souffler et mourir.
 
 Parle en **français**, simplement, et explique ce que tu fais.
 
@@ -61,7 +62,7 @@ Ne renomme pas les parties `Crest1`, `BellyGlow1`, `Crack1`… du Mythique : l'a
    - **Anchored** coché.
 3. Le modèle arrive dans le Workspace.
 
-**Toi, vérifie la taille** avec `GetExtentsSize()` : environ 16,5 × 19 × 58. Si c'est environ 3,5 fois trop grand ou trop petit, c'est l'unité : dis-le-moi pour que je réimporte (le format `.glb` est prévu en mètres). Vérifie aussi que les **9 parties** sont là avec les bons noms. Si Studio les a renommées (par exemple `Body_Mesh`), renomme-les comme dans le tableau.
+**Toi, vérifie la taille** avec `GetExtentsSize()` : environ 16,5 × 19 × 58. Si c'est environ 3,5 fois trop grand ou trop petit, c'est l'unité : dis-le-moi pour que je réimporte (le format `.glb` est prévu en mètres). Vérifie aussi que les **9 parties** sont là avec les bons noms (le Mythique en a davantage : `Crest1`…, `BellyGlow1`…, `Crack1`…, `Aura` ; ne les renomme pas). Si Studio les a renommées (par exemple `Body_Mesh`), renomme-les comme dans le tableau.
 
 ## A. Réglages du modèle
 1. Range le modèle dans `ServerStorage > Dragons` (crée le dossier s'il n'existe pas) et nomme-le `Dragon_Long_<Rareté>` (le script de réglage le fait tout seul).
@@ -87,12 +88,12 @@ Un `PointLight` jaune très discret dans `Eyes` (Brightness 0,5, Range 6, `Shado
 
 ## D. Vérifications finales
 - Lance le jeu et lis la console : **aucune erreur rouge**.
-- Simulateur d'appareil **téléphone** : la scène reste fluide avec le dragon visible. Avec environ 29 600 triangles, un dragon à l'écran ne pose pas de problème ; s'il en faut beaucoup, dis-le-moi, il faudra une version allégée.
+- Simulateur d'appareil **téléphone** : la scène reste fluide avec le dragon visible. Avec environ 29 600 triangles (31 500 pour le Mythique), un dragon à l'écran ne pose pas de problème ; s'il en faut beaucoup, dis-le-moi, il faudra une version allégée.
 - Récapitule-moi ce que tu as fait, où est rangé le modèle, et ce qui reste à faire.
 
 ## E. Animation
 Fichiers fournis avec le modèle : `DragonAnimator.client.lua` et `DragonDemo.server.lua`.
-1. Vérifie que l'import a bien créé des **Bones** (objets `Bone`) dans les MeshParts du dragon, avec les noms `Root`, `Neck2`, `Neck`, `Head`, `Jaw`, `S01`…`S14`, `Eye_L`, `Pupil_L`, `Lid_L`, `LidLow_L`, `Mane_Top`, `LegFL_Upper`… (45 en tout). S'il n'y en a aucun, l'import a perdu le squelette : préviens-moi.
+1. Vérifie que l'import a bien créé des **Bones** (objets `Bone`) dans les MeshParts du dragon, avec les noms `Root`, `Neck2`, `Neck`, `Head`, `Jaw`, `S01`…`S14`, `Eye_L`, `Pupil_L`, `Lid_L`, `LidLow_L`, `Mane_Top`, `LegFL_Upper`… (45 en tout, 53 pour le Mythique). S'il n'y en a aucun, l'import a perdu le squelette : préviens-moi.
 2. Crée un **LocalScript** `DragonAnimator` dans `StarterPlayer > StarterPlayerScripts` et colle `DragonAnimator.client.lua`. Il anime chez chaque joueur tout Model tagué `DragonLong` (le script de réglage ajoute le tag) ou dont le nom commence par `Dragon_Long`.
 3. Le mode se règle avec l'attribut **`Mode`** du Model : `Idle` (repos), `Fly` (vol), `Dead` (mort).
 4. Pour tester : crée un **Script** `DragonDemo` dans `ServerScriptService` et colle `DragonDemo.server.lua`. Le dragon `Dragon_Long_Test` enchaîne repos, rugissement, morsure, vol en cercle, souffle, mort et relevé. **Si le dragon avance à reculons**, mets `HEAD_FORWARD = -1` en haut du script.
