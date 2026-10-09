@@ -4,12 +4,13 @@
   const BLINK = 0.45;              // la paupière descend un peu (rad)…
   const SINK = 0.75;               // …et l'œil s'enfonce dans l'orbite (studs) : l'œil paraît fermé
   const MODES = {
-    Idle: { side: 0.035, pitch: 0.015, wave: 1.2, tuck: 0, walk: 0, mane: 0.12, maneSpeed: 1.6, jaw: 0.04, bob: 0.15, bank: 0, dive: 0, neck: 0.75, sway: 0, swayPh: 0, tail: 1 },
-    Walk: { side: 0.07, pitch: 0.012, wave: 3.4, tuck: 0, walk: 1, mane: 0.2, maneSpeed: 3.2, jaw: 0.07, bob: 0.2, bank: 0, dive: 0, neck: 0.75, sway: 0, swayPh: 0, tail: 1 },
-    // Vol : grandes vagues verticales qui descendent du cou vers la queue (le dragon « nage » dans l'air),
+    Idle: { side: 0.035, pitch: 0.015, wave: 1.2, tuck: 0, walk: 0, mane: 0.12, maneSpeed: 1.6, jaw: 0.04, bob: 0.15, bank: 0, dive: 0, neck: 0.75, sway: 0, swayPh: 0, tail: 1, helix: 0 },
+    Walk: { side: 0.07, pitch: 0.012, wave: 3.4, tuck: 0, walk: 1, mane: 0.2, maneSpeed: 3.2, jaw: 0.07, bob: 0.2, bank: 0, dive: 0, neck: 0.75, sway: 0, swayPh: 0, tail: 1, helix: 0 },
+    // Vol : vague en spirale (le corps s'enroule comme un tire-bouchon, comme les dragons chinois) + tonneaux,
+    // grandes vagues qui descendent du cou vers la queue (le dragon « nage » dans l'air),
     // un peu de roulis et de tangage de tout le corps, crinière soulevée qui claque au vent.
     Fly:  { side: 0.05, pitch: 0.1, wave: 2.6, tuck: 1, walk: 0, mane: 0.5, maneSpeed: 7, jaw: 0.14, bob: 1.4, bank: 0.12, dive: 0.05,
-            neck: 1.0, sway: 0.18, swayPh: 2.0, tail: 0.5 }
+            neck: 1.0, sway: 0.18, swayPh: 2.0, tail: 0.5, helix: 1 }
   };
   const TAIL = [];
   for (let k = 1; k <= 14; k++) TAIL.push("S" + String(k).padStart(2, "0"));
@@ -20,7 +21,7 @@
     // setBone(name, rx, ry, rz, ty, tz) : rotation (X puis Y puis Z, comme CFrame.Angles) + petit décalage
     // le long des axes Y et Z de l'os
     const st = { mode: "Idle", p: Object.assign({}, MODES.Idle), phase: 0, step: 0, flutter: 0, t: 0,
-      blinkIn: 2, blink: -1, look: 0, lookTarget: 0, lookIn: 1.5, headLook: 0, headTarget: 0 };
+      blinkIn: 2, blink: -1, rollIn: 3, roll: -1, look: 0, lookTarget: 0, lookIn: 1.5, headLook: 0, headTarget: 0 };
     function rnd(a, b) { return a + Math.random() * (b - a); }
     function update(dt, mode) {
       st.t += dt;
@@ -35,15 +36,19 @@
       // Colonne : une onde qui part du cou et grandit vers la queue.
       TAIL.forEach(function (name, i) {
         const k1 = i + 1, grow = 0.6 + 0.4 * k1 / 14;
-        const yaw = p.side * grow * Math.sin(st.phase * 0.7 - k1 * 0.4 + 1);
-        const pitch = p.pitch * p.tail * grow * Math.sin(st.phase - k1 * 0.45);
+        // helix = 1 : le côté suit le haut/bas avec un quart de tour d'avance, chaque anneau décrit un cercle.
+        const amp = p.pitch * p.tail * grow;
+        const yaw = p.side * grow * Math.sin(st.phase * 0.7 - k1 * 0.4 + 1) * (1 - p.helix)
+          + amp * p.helix * Math.cos(st.phase - k1 * 0.45);
+        const pitch = amp * Math.sin(st.phase - k1 * 0.45);
         setBone(name, pitch, yaw, 0, 0);
       });
       // Cou : la même onde continue jusqu'à la tête (signe inversé : ces os pointent vers l'avant).
       let neckPitch = 0, neckYaw = 0;
       NECK.forEach(function (n) {
         const k1 = n[1];
-        const yaw = -p.side * p.neck * Math.sin(st.phase * 0.7 - k1 * 0.4 + 1);
+        const yaw = -p.side * p.neck * Math.sin(st.phase * 0.7 - k1 * 0.4 + 1) * (1 - p.helix)
+          - p.pitch * p.neck * p.helix * Math.cos(st.phase - k1 * 0.45);
         const pitch = -p.pitch * p.neck * Math.sin(st.phase - k1 * 0.45);
         setBone(n[0], pitch, yaw, 0, 0);
         neckPitch += pitch;
@@ -51,7 +56,18 @@
       });
       // Tout le corps : monte et descend, pique légèrement et s'incline (roulis) en vol.
       // sway : le poitrail bascule au rythme de la vague, ce qui fait monter et descendre tout l'avant.
-      setBone("Root", p.dive * Math.sin(st.phase * 0.5) + p.sway * Math.sin(st.phase + p.swayPh), 0, p.bank * Math.sin(st.phase * 0.35), 
+      // Tonneau : en vol, toutes les 6 à 10 s, le dragon fait un tour complet sur lui-même (2,4 s).
+      st.rollIn -= dt * p.helix;
+      if (st.rollIn <= 0 && st.roll < 0 && p.helix > 0.9) { st.roll = 0; st.rollIn = rnd(6, 10); }
+      let rollAngle = 0;
+      if (st.roll >= 0) {
+        st.roll += dt / 2.4;
+        const r = Math.min(1, st.roll);
+        rollAngle = 2 * Math.PI * r * r * (3 - 2 * r);
+        if (st.roll >= 1) st.roll = -1;
+      }
+      setBone("Root", p.dive * Math.sin(st.phase * 0.5) + p.sway * Math.sin(st.phase + p.swayPh), 0,
+        p.bank * Math.sin(st.phase * 0.35) + rollAngle, 
         p.bob * Math.sin(st.phase * 0.5 + 1) + 0.12 * p.walk * Math.abs(Math.sin(st.step)));
 
       // Tête : compense l'ondulation pour garder le regard stable, et regarde autour en Idle.
