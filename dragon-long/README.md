@@ -9,7 +9,7 @@ Comparaisons : [gueule v15 / v16](comparaison-gueule-Dragon_Long_v15-Dragon_Long
 
 | Version | Fichier | Triangles | Nouveautés |
 |---|---|---|---|
-| **v19 animé** (actuelle) | `objets/Dragon_Long_v19_rig.glb` | 29 606 | même modèle avec un squelette de 45 os (colonne, tête, mâchoire, yeux, pupilles, paupières du haut et du bas, crinière, moustaches, barbichette, pattes) ; animé par `roblox/DragonAnimator.client.lua` (repos, marche, vol avec une vague continue de la tête à la queue, regard, clignements) — [démo](https://claude.ai/artifact/CoMHQnaW5y4rfVDCPfsx8h) |
+| **v19 animé** (actuelle) | `objets/Dragon_Long_v19_rig.glb` | 29 606 | même modèle avec un squelette de 45 os (colonne, tête, mâchoire, yeux, pupilles, paupières du haut et du bas, crinière, moustaches, barbichette, pattes) ; animé par `roblox/DragonAnimator.client.lua` (repos, vol avec une vague continue de la tête à la queue, regard, clignements) — [démo](https://claude.ai/artifact/CoMHQnaW5y4rfVDCPfsx8h) |
 | **v19** | `objets/Dragon_Long_v19.glb` | 29 606 | vraies paupières en coque (haut et bas) qui glissent sur l'œil pour cligner ; pupilles sur leur propre os pour le regard ; repère des os des yeux corrigé (l'œil gauche était en miroir) |
 | v18 | `objets/Dragon_Long_v18.glb` | 28 662 | crête du dos en mèches de flammes (même style que la crinière), petites flammes sur les côtés de la queue, grande flamme en éventail au bout de la queue ; écailles du corps couchées en tuiles plates (même nombre qu'avant) |
 | v17 | `objets/Dragon_Long_v17.glb` | 26 058 | cornes épaisses à anneaux en relief avec 2 branches ; pattes musclées (épaule, biceps, coude marqué avec mèches de flammes, pied large à 3 doigts articulés, griffes recourbées, ergot) ; crinière en 2 couches de mèches de flammes qui ondulent et finissent en pointe ; flammes des joues dans le même style ([aperçu](apercu-Dragon_Long_v17.png)) |
@@ -71,8 +71,8 @@ Le Mythique a en plus 8 os `Crest1`…`Crest8` (cristaux flottants) et des parti
 
 ## Animation
 - `generateur/build_rig.py` exporte `objets/Dragon_Long_v19_rig.glb` (même géométrie, plus le squelette et les poids de peau) et `objets/Dragon_Long_v19_rig.json` (liste des os).
-- `roblox/DragonAnimator.client.lua` (LocalScript, StarterPlayerScripts) anime les os ; l'attribut `Mode` du Model choisit `Idle`, `Walk` ou `Fly`.
-- `roblox/DragonDemo.server.lua` (Script, ServerScriptService, optionnel) fait enchaîner repos, marche et vol en cercle.
+- `roblox/DragonAnimator.client.lua` (LocalScript, StarterPlayerScripts) anime les os ; l'attribut `Mode` du Model choisit `Idle`, `Fly` ou `Dead`.
+- `roblox/DragonDemo.server.lua` (Script, ServerScriptService, optionnel) fait enchaîner repos, rugissement, morsure, vol en cercle, souffle, mort et relevé.
 - `demo/animator.js` est la même logique en JavaScript, utilisée par la démo web (`demo/effects.js` : particules du souffle).
 - Actions (attribut `Action` du Model) : `Roar` (rugissement, onde de choc), `Bite` (morsure ; vise l'attribut `Target`
   s'il est réglé, étincelles au claquement), `Breath` (souffle ; style avec l'attribut

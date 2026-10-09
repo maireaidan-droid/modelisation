@@ -7,7 +7,7 @@ L'animation tourne chez chaque joueur (les os ne se répliquent pas depuis le se
 Le dragon est trouvé automatiquement :
   - tout Model qui porte le tag « DragonLong » (CollectionService), ou dont le nom commence par « Dragon_Long ».
 Le mode se choisit avec l'attribut « Mode » du Model (réglable depuis un script serveur, il se réplique) :
-  "Idle" (repos), "Walk" (marche), "Fly" (vol). Les changements de mode sont progressifs.
+  "Idle" (repos), "Fly" (vol), "Dead" (mort). Les changements de mode sont progressifs.
 
 Ce qui est animé :
   - corps : piloté comme un serpent. On décrit la forme voulue de tout le corps (une vague qui glisse de la tête
@@ -17,7 +17,7 @@ Ce qui est animé :
   - yeux : la pupille glisse sur l'œil par petits sauts rapides (le regard), la tête suit ; clignements avec de vraies paupières (haut et bas) qui glissent sur l'œil :
     fermeture rapide, réouverture plus lente avec un petit rebond, parfois double, parfois lent au repos ;
   - crinière, moustaches, barbichette : flottent, plus fort en vol ;
-  - pattes : marche en diagonale, repliées vers l'arrière en vol ;
+  - pattes : repliées vers l'arrière en vol ;
   - actions (attribut « Action » du Model, réglé par un script serveur) : "Roar" (rugissement), "Bite" (morsure ;
     elle vise la position donnée par l'attribut « Target » (Vector3) s'il existe, sinon tout droit),
     "Breath" (souffle, avec des particules qui sortent de la gueule). Le rugissement lance une onde de choc et fait
@@ -52,14 +52,12 @@ local WHITE, LILAC = Color3.new(1, 1, 1), Color3.fromHex("#C9A2FF")
 -- helix : décalage entre les deux (pi/2 = chaque anneau décrit un cercle, le corps s'enroule en spirale) ;
 -- center : recentrage du corps (1 = tout le corps ondule autour de son milieu, 0 = ancré au poitrail).
 local MODES = {
-	Idle = { up = 0.03, side = 0.06, speed = 1.2, helix = 0, center = 0, tuck = 0, walk = 0, mane = 0.12, maneSpeed = 1.6,
+	Idle = { up = 0.03, side = 0.06, speed = 1.2, helix = 0, center = 0, tuck = 0, mane = 0.12, maneSpeed = 1.6,
 		jaw = 0.04, bob = 0.15, bank = 0, head = 0.6, dead = 0 },
-	Walk = { up = 0.02, side = 0.13, speed = 3.4, helix = 0, center = 0, tuck = 0, walk = 1, mane = 0.2, maneSpeed = 3.2,
-		jaw = 0.07, bob = 0.2, bank = 0, head = 0.5, dead = 0 },
-	Fly = { up = 0.34, side = 0.16, speed = 2.0, helix = 1.57, center = 1, tuck = 1, walk = 0, mane = 0.42, maneSpeed = 5,
+	Fly = { up = 0.34, side = 0.16, speed = 2.0, helix = 1.57, center = 1, tuck = 1, mane = 0.42, maneSpeed = 5,
 		jaw = 0.12, bob = 0.8, bank = 0.1, head = 0.45, dead = 0 },
 	-- Mort : le corps cesse d'onduler, s'effondre sur le flanc en se courbant, yeux fermés, pattes molles.
-	Dead = { up = 0, side = 0, speed = 0.3, helix = 0, center = 0, tuck = 0, walk = 0, mane = 0.03, maneSpeed = 0.8,
+	Dead = { up = 0, side = 0, speed = 0.3, helix = 0, center = 0, tuck = 0, mane = 0.03, maneSpeed = 0.8,
 		jaw = 0, bob = 0, bank = 0, head = 1, dead = 1 },
 }
 
@@ -153,7 +151,7 @@ local ORDER = { BY_NAME.Root, BY_NAME.Neck2, BY_NAME.Neck, BY_NAME.Head }
 for k = 5, #SPINE do
 	table.insert(ORDER, SPINE[k])
 end
-local LEGS = { LegFL = { 0, 14 }, LegBR = { 0, 42 }, LegFR = { math.pi, 14 }, LegBL = { math.pi, 42 } }
+local LEGS = { LegFL = 14, LegBR = 42, LegFR = 14, LegBL = 42 } -- position de chaque patte le long du corps
 
 local rng = Random.new()
 local dragons = {} -- [Model] = état
@@ -201,7 +199,7 @@ local function newState(model)
 	end
 	return {
 		model = model, bones = collectBones(model), glow = collectGlow(model), p = p,
-		phase = rng:NextNumber(0, 6), step = 0, flutter = 0, pulse = 0, t = 0,
+		phase = rng:NextNumber(0, 6), flutter = 0, pulse = 0, t = 0,
 		action = nil, actionT = 0, breath = 0, cry = 0, burst = nil, aimYaw = 0, aimPitch = 0, turn = 0, deadT = 0, yaw = nil,
 		blinkIn = rng:NextNumber(1, 4), blink = nil,
 		headLook = 0, headTarget = 0,
@@ -311,7 +309,6 @@ local function update(st, dt, turn)
 		p[key] += (v - p[key]) * k
 	end
 	st.phase += dt * p.speed
-	st.step += dt * 4.2 * p.walk
 	st.flutter += dt * p.maneSpeed
 	st.pulse += dt * (1.3 + 1.7 * p.tuck) -- vague de lumière (Mythique) : plus rapide en vol
 	st.turn += (math.clamp(turn or 0, -1.5, 1.5) - st.turn) * math.min(1, dt * 3)
@@ -381,7 +378,7 @@ local function update(st, dt, turn)
 		local name, parent = b[1], b[3]
 		if name == "Root" then
 			setBone(st, "Root", ax.Root, ay.Root, p.bank * math.sin(st.phase * 0.3) - 0.6 * st.turn * p.tuck - 1.35 * d,
-				cy + p.bob * math.sin(st.phase * 0.4 + 1) + 0.12 * p.walk * math.abs(math.sin(st.step)) + act.lift
+				cy + p.bob * math.sin(st.phase * 0.4 + 1) + act.lift
 					- DEAD_DROP * d, act.push, cx)
 		elseif name ~= "Head" then
 			setBone(st, name, ax[name] - ax[parent], ay[name] - ay[parent], 0)
@@ -389,7 +386,7 @@ local function update(st, dt, turn)
 	end
 
 	-- Regard : la pupille saute vite vers un nouveau point (~80 ms), s'y fixe, avec de petits micro-mouvements.
-	-- Au repos le dragon regarde partout et la tête suit le regard avec un temps de retard ; en marche et en vol
+	-- Au repos le dragon regarde partout et la tête suit le regard avec un temps de retard ; en vol
 	-- il regarde surtout devant. Un grand changement de regard s'accompagne parfois d'un clignement.
 	st.gazeIn -= dt
 	if st.gazeIn <= 0 then
@@ -481,15 +478,12 @@ local function update(st, dt, turn)
 		gl[1].Color = gl[3]:Lerp(gl[4], gl[5] * pulseAt(st, gl[2]))
 	end
 
-	-- Pattes : marche en diagonale ; en vol, repliées et elles suivent doucement la vague du corps.
-	for leg, info in pairs(LEGS) do
-		local ph = st.step + info[1]
-		local sw, up = math.sin(ph), math.max(0, math.cos(ph))
-		local flow = 0.5 * (bodyAngles(st, info[2] + 6)) * p.tuck
-		-- Mort : pattes molles, un peu écartées du corps.
-		setBone(st, leg .. "_Upper", -0.45 * sw * p.walk + 0.9 * p.tuck + flow + 0.45 * d, 0, 0)
-		setBone(st, leg .. "_Fore", 0.6 * up * p.walk + 0.6 * p.tuck + flow + 0.35 * d, 0, 0)
-		setBone(st, leg .. "_Foot", -0.35 * up * p.walk - 0.4 * p.tuck - 0.2 * d, 0, 0)
+	-- Pattes : en vol, repliées et elles suivent doucement la vague du corps ; mort, molles et écartées.
+	for leg, sp in pairs(LEGS) do
+		local flow = 0.5 * (bodyAngles(st, sp + 6)) * p.tuck
+		setBone(st, leg .. "_Upper", 0.9 * p.tuck + flow + 0.45 * d, 0, 0)
+		setBone(st, leg .. "_Fore", 0.6 * p.tuck + flow + 0.35 * d, 0, 0)
+		setBone(st, leg .. "_Foot", -0.4 * p.tuck - 0.2 * d, 0, 0)
 	end
 end
 

@@ -4,7 +4,7 @@ DragonDemo (optionnel) : fait vivre un dragon pour tester les animations.
 À placer dans : ServerScriptService (Script). Le dragon doit être dans le Workspace et s'appeler « Dragon_Long_Test »
 (c'est le nom que lui donne setup_dragon_long.lua), sinon change DRAGON_NAME.
 
-Cycle : repos et rugissement, marche en ligne droite puis morsure, vol en cercle (le corps se courbe dans le
+Cycle : repos et rugissement, morsure, vol en cercle (le corps se courbe dans le
 virage), atterrissage et souffle, puis il meurt et se relève.
 Le serveur ne fait que déplacer le Model et régler les attributs « Mode » et « Action » ; les os sont animés par
 DragonAnimator chez chaque joueur.
@@ -14,7 +14,6 @@ local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
 local DRAGON_NAME = "Dragon_Long_Test"
-local WALK_SPEED = 8      -- studs/s
 local FLY_SPEED = 30      -- studs/s
 local FLY_RADIUS = 60
 local FLY_HEIGHT = 35
@@ -64,12 +63,7 @@ while true do
 	playAction("Roar")
 	task.wait(3)
 
-	-- Marche : avance tout droit (la tête regarde vers l'avant du modèle).
-	setMode("Walk")
-	run(8, function(dt)
-		dragon:PivotTo(dragon:GetPivot() * CFrame.new(0, 0, HEAD_FORWARD * WALK_SPEED * dt))
-	end)
-	setMode("Idle")
+	-- Morsure vers le joueur le plus proche
 	aimAtNearestPlayer()
 	playAction("Bite")
 	task.wait(1.5)

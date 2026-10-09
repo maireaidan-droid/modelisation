@@ -154,7 +154,7 @@ end
 
 if body then model.PrimaryPart = body end
 
--- Animation : DragonAnimator retrouve le dragon grâce à ce tag et lit son mode (Idle / Walk / Fly).
+-- Animation : DragonAnimator retrouve le dragon grâce à ce tag et lit son mode (Idle / Fly / Dead).
 CollectionService:AddTag(model, "DragonLong")
 if model:GetAttribute("Mode") == nil then model:SetAttribute("Mode", "Idle") end
 

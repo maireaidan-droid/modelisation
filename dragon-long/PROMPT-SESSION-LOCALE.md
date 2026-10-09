@@ -6,7 +6,7 @@
 ---
 
 ## Contexte
-Tu m'aides à intégrer un **dragon chinois (Long)** dans mon jeu Roblox. C'est un modèle low-poly à facettes, généré par code, en **un seul fichier `.glb` découpé en 9 parties** (une par couleur). Il a un **squelette de 45 os** : un script (`DragonAnimator`) le fait onduler, cligner des yeux, marcher et voler.
+Tu m'aides à intégrer un **dragon chinois (Long)** dans mon jeu Roblox. C'est un modèle low-poly à facettes, généré par code, en **un seul fichier `.glb` découpé en 9 parties** (une par couleur). Il a un **squelette de 45 os** : un script (`DragonAnimator`) le fait onduler, cligner des yeux, voler, rugir, mordre, souffler et mourir.
 
 Parle en **français**, simplement, et explique ce que tu fais.
 
@@ -78,9 +78,9 @@ Un `PointLight` jaune très discret dans `Eyes` (Brightness 0,5, Range 6, `Shado
 Fichiers fournis avec le modèle : `DragonAnimator.client.lua` et `DragonDemo.server.lua`.
 1. Vérifie que l'import a bien créé des **Bones** (objets `Bone`) dans les MeshParts du dragon, avec les noms `Root`, `Neck2`, `Neck`, `Head`, `Jaw`, `S01`…`S14`, `Eye_L`, `Pupil_L`, `Lid_L`, `LidLow_L`, `Mane_Top`, `LegFL_Upper`… (45 en tout). S'il n'y en a aucun, l'import a perdu le squelette : préviens-moi.
 2. Crée un **LocalScript** `DragonAnimator` dans `StarterPlayer > StarterPlayerScripts` et colle `DragonAnimator.client.lua`. Il anime chez chaque joueur tout Model tagué `DragonLong` (le script de réglage ajoute le tag) ou dont le nom commence par `Dragon_Long`.
-3. Le mode se règle avec l'attribut **`Mode`** du Model : `Idle` (repos), `Walk` (marche), `Fly` (vol).
-4. Pour tester : crée un **Script** `DragonDemo` dans `ServerScriptService` et colle `DragonDemo.server.lua`. Le dragon `Dragon_Long_Test` enchaîne repos, marche et vol en cercle. **Si le dragon avance à reculons**, mets `HEAD_FORWARD = -1` en haut du script.
-5. Lance le jeu (Play) et montre-moi une vidéo ou des captures : ondulation, clignement, pattes en marche, pattes repliées en vol,
+3. Le mode se règle avec l'attribut **`Mode`** du Model : `Idle` (repos), `Fly` (vol), `Dead` (mort).
+4. Pour tester : crée un **Script** `DragonDemo` dans `ServerScriptService` et colle `DragonDemo.server.lua`. Le dragon `Dragon_Long_Test` enchaîne repos, rugissement, morsure, vol en cercle, souffle, mort et relevé. **Si le dragon avance à reculons**, mets `HEAD_FORWARD = -1` en haut du script.
+5. Lance le jeu (Play) et montre-moi une vidéo ou des captures : ondulation, clignement, pattes repliées en vol,
    corps qui se courbe dans le virage en vol, rugissement, morsure, souffle de feu, mort puis relevé.
 
 ### Actions, virages et mort

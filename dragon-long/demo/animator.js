@@ -20,16 +20,14 @@
   // helix : décalage entre les deux (pi/2 = chaque anneau décrit un cercle, le corps s'enroule en spirale) ;
   // center : recentrage du corps (1 = tout le corps ondule autour de son milieu, 0 = ancré au poitrail).
   const MODES = {
-    Idle: { up: 0.03, side: 0.06, speed: 1.2, helix: 0, center: 0, tuck: 0, walk: 0, mane: 0.12, maneSpeed: 1.6,
+    Idle: { up: 0.03, side: 0.06, speed: 1.2, helix: 0, center: 0, tuck: 0, mane: 0.12, maneSpeed: 1.6,
             jaw: 0.04, bob: 0.15, bank: 0, head: 0.6, dead: 0 },
-    Walk: { up: 0.02, side: 0.13, speed: 3.4, helix: 0, center: 0, tuck: 0, walk: 1, mane: 0.2, maneSpeed: 3.2,
-            jaw: 0.07, bob: 0.2, bank: 0, head: 0.5, dead: 0 },
     // Vol : longue vague souple et continue de la tête à la queue, un peu en spirale ; le dragon « nage » dans
     // l'air. Léger roulis, crinière soulevée, pattes repliées qui suivent la vague.
-    Fly:  { up: 0.34, side: 0.16, speed: 2.0, helix: 1.57, center: 1, tuck: 1, walk: 0, mane: 0.42, maneSpeed: 5,
+    Fly:  { up: 0.34, side: 0.16, speed: 2.0, helix: 1.57, center: 1, tuck: 1, mane: 0.42, maneSpeed: 5,
             jaw: 0.12, bob: 0.8, bank: 0.1, head: 0.45, dead: 0 },
     // Mort : le corps cesse d'onduler, s'effondre sur le flanc en se courbant, yeux fermés, pattes molles.
-    Dead: { up: 0, side: 0, speed: 0.3, helix: 0, center: 0, tuck: 0, walk: 0, mane: 0.03, maneSpeed: 0.8,
+    Dead: { up: 0, side: 0, speed: 0.3, helix: 0, center: 0, tuck: 0, mane: 0.03, maneSpeed: 0.8,
             jaw: 0, bob: 0, bank: 0, head: 1, dead: 1 }
   };
 
@@ -119,7 +117,7 @@
   // Ordre parent → enfant (pour cumuler les positions depuis le poitrail).
   const ORDER = ["Root", "Neck2", "Neck", "Head"].concat(SPINE.slice(4).map(function (b) { return b[0]; }))
     .map(function (n) { return SPINE.find(function (b) { return b[0] === n; }); });
-  const LEGS = { LegFL: [0, 14], LegBR: [0, 42], LegFR: [Math.PI, 14], LegBL: [Math.PI, 42] };
+  const LEGS = { LegFL: 14, LegBR: 42, LegFR: 14, LegBL: 42 };   // position de chaque patte le long du corps
 
   // Fermeture des paupières (0 = ouvert, 1 = fermé) à l'instant tt d'un clignement b.
   function closeOnce(b, tt) {
@@ -138,7 +136,7 @@
   function create(bones, setBone) {
     // setBone(name, rx, ry, rz, ty, tz, tx) : rotation (X puis Y puis Z, comme CFrame.Angles) + décalage
     // le long des axes de l'os
-    const st = { p: Object.assign({}, MODES.Idle), phase: 0, step: 0, flutter: 0, pulse: 0, t: 0,
+    const st = { p: Object.assign({}, MODES.Idle), phase: 0, flutter: 0, pulse: 0, t: 0,
       action: null, actionT: 0, breath: 0, cry: 0, burst: null, aimYaw: 0, aimPitch: 0, turn: 0, deadT: 0,
       blinkIn: 2, blink: null, headLook: 0, headTarget: 0,
       gazeX: 0, gazeY: 0, gazeTx: 0, gazeTy: 0, gazeIn: 1, microX: 0, microY: 0, microIn: 0.5 };
@@ -176,7 +174,6 @@
       for (const key in target) st.p[key] += (target[key] - st.p[key]) * k;
       const p = st.p;
       st.phase += dt * p.speed;
-      st.step += dt * 4.2 * p.walk;
       st.flutter += dt * p.maneSpeed;
       st.pulse += dt * (1.3 + 1.7 * p.tuck);       // vague de lumière (Mythique) : plus rapide en vol
       st.turn += (Math.max(-1.5, Math.min(1.5, turn || 0)) - st.turn) * Math.min(1, dt * 3);
@@ -238,7 +235,7 @@
         if (name === "Head") return;
         if (!parent) {
           setBone("Root", a[0], a[1], p.bank * Math.sin(st.phase * 0.3) - 0.6 * st.turn * p.tuck - 1.35 * d,
-            cy + p.bob * Math.sin(st.phase * 0.4 + 1) + 0.12 * p.walk * Math.abs(Math.sin(st.step)) + act.lift
+            cy + p.bob * Math.sin(st.phase * 0.4 + 1) + act.lift
               - DEAD_DROP * d, act.push, cx);
           return;
         }
@@ -247,7 +244,7 @@
       });
 
       // Regard : la pupille saute vite vers un nouveau point (~80 ms), s'y fixe, avec de petits micro-mouvements.
-      // Au repos le dragon regarde partout et la tête suit le regard avec un temps de retard ; en marche et en vol
+      // Au repos le dragon regarde partout et la tête suit le regard avec un temps de retard ; en vol
       // il regarde surtout devant. Un grand changement de regard s'accompagne parfois d'un clignement.
       st.gazeIn -= dt;
       if (st.gazeIn <= 0) {
@@ -333,16 +330,12 @@
           0.35 * Math.sin(st.t * 1.6 + c * 0.7) + 0.3 * pulseAt(c), 0);
       }
 
-      // Pattes : marche en diagonale ; en vol, repliées et elles suivent doucement la vague du corps.
+      // Pattes : en vol, repliées et elles suivent doucement la vague du corps ; mort, molles et écartées.
       for (const leg in LEGS) {
-        const off = LEGS[leg][0], s = LEGS[leg][1];
-        const ph = st.step + off;
-        const sw = Math.sin(ph), up = Math.max(0, Math.cos(ph));
-        const flow = 0.5 * bodyAngles(p, s + 6)[0] * p.tuck;
-        // Mort : pattes molles, un peu écartées du corps.
-        setBone(leg + "_Upper", -0.45 * sw * p.walk + 0.9 * p.tuck + flow + 0.45 * d, 0, 0, 0, 0);
-        setBone(leg + "_Fore", 0.6 * up * p.walk + 0.6 * p.tuck + flow + 0.35 * d, 0, 0, 0, 0);
-        setBone(leg + "_Foot", -0.35 * up * p.walk - 0.4 * p.tuck - 0.2 * d, 0, 0, 0, 0);
+        const flow = 0.5 * bodyAngles(p, LEGS[leg] + 6)[0] * p.tuck;
+        setBone(leg + "_Upper", 0.9 * p.tuck + flow + 0.45 * d, 0, 0, 0, 0);
+        setBone(leg + "_Fore", 0.6 * p.tuck + flow + 0.35 * d, 0, 0, 0, 0);
+        setBone(leg + "_Foot", -0.4 * p.tuck - 0.2 * d, 0, 0, 0, 0);
       }
     }
     return { update: update, play: play, state: st, pulseAt: pulseAt };
