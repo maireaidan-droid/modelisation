@@ -8,6 +8,10 @@
 (function (global) {
   const BLINK_UP = 1.449;          // fermeture de la paupière du haut (rad, elle glisse vers le bas sur l'œil)
   const BLINK_LOW = 0.349;         // la paupière du bas remonte à sa rencontre
+  const EYE = { L: 0.78, D: 0.247 };  // demi-longueur et profondeur de l'œil (studs)
+  // Course de la pupille sur l'œil (studs) : moins vers l'avant, où l'œil s'enfonce sous l'arcade près du nez.
+  const GAZE_FWD = 0.15, GAZE_BACK = 0.34, GAZE_Y = 0.07;
+  const PUPIL_FWD = { L: -1, R: 1 };  // sens « vers l'avant » de l'axe X de chaque pupille
   const SEG = 0.8;                 // longueur du corps par pas de colonne (studs)
   const KAPPA = 0.11;              // nombre d'onde : ~1,3 vague sur toute la longueur du corps
 
@@ -53,7 +57,8 @@
     // setBone(name, rx, ry, rz, ty, tz, tx) : rotation (X puis Y puis Z, comme CFrame.Angles) + décalage
     // le long des axes de l'os
     const st = { p: Object.assign({}, MODES.Idle), phase: 0, step: 0, flutter: 0, t: 0,
-      blinkIn: 2, blink: null, look: 0, lookTarget: 0, lookIn: 1.5, headLook: 0, headTarget: 0 };
+      blinkIn: 2, blink: null, headLook: 0, headTarget: 0,
+      gazeX: 0, gazeY: 0, gazeTx: 0, gazeTy: 0, gazeIn: 1, microX: 0, microY: 0, microIn: 0.5 };
     function rnd(a, b) { return a + Math.random() * (b - a); }
 
     // Forme du corps : angle de la colonne (haut/bas, côté) à la position s.
@@ -105,16 +110,34 @@
         setBone(name, a[0] - pa[0], a[1] - pa[1], 0, 0, 0);
       });
 
-      // Tête : suit la vague (en plus calme) et regarde autour d'elle au repos.
-      st.lookIn -= dt;
-      if (st.lookIn <= 0) {
-        st.lookIn = rnd(1.5, 4);
-        st.lookTarget = rnd(-0.2, 0.2);
+      // Regard : la pupille saute vite vers un nouveau point (~80 ms), s'y fixe, avec de petits micro-mouvements.
+      // Au repos le dragon regarde partout et la tête suit le regard avec un temps de retard ; en marche et en vol
+      // il regarde surtout devant. Un grand changement de regard s'accompagne parfois d'un clignement.
+      st.gazeIn -= dt;
+      if (st.gazeIn <= 0) {
+        const nx = mode === "Idle" ? rnd(-1, 1) : rnd(0.1, 1);
+        const ny = mode === "Idle" ? rnd(-1, 1) : rnd(-0.4, 0.4);
+        if (Math.abs(nx - st.gazeTx) > 0.8 && !st.blink && Math.random() < 0.3) {
+          st.blink = { t: 0, close: 0.07, hold: 0.04, open: 0.15, twice: false };
+        }
+        st.gazeTx = nx;
+        st.gazeTy = ny;
+        st.gazeIn = rnd(0.6, 3);
         st.headTarget = mode === "Idle" ? rnd(-0.25, 0.25) : 0;
       }
-      st.look += (st.lookTarget - st.look) * Math.min(1, dt * 6);
+      st.microIn -= dt;
+      if (st.microIn <= 0) {
+        st.microIn = rnd(0.25, 0.7);
+        st.microX = rnd(-0.07, 0.07);
+        st.microY = rnd(-0.07, 0.07);
+      }
+      const gk = Math.min(1, dt * 28);
+      st.gazeX += (st.gazeTx + st.microX - st.gazeX) * gk;
+      st.gazeY += (st.gazeTy + st.microY - st.gazeY) * gk;
       st.headLook += (st.headTarget - st.headLook) * Math.min(1, dt * 1.5);
-      setBone("Head", abs.Head[0] - abs.Neck[0] + 0.04 * Math.sin(st.t * 0.9),
+
+      // Tête : suit la vague (en plus calme), suit le regard avec retard et lève ou baisse un peu le nez avec lui.
+      setBone("Head", abs.Head[0] - abs.Neck[0] + 0.04 * Math.sin(st.t * 0.9) - 0.06 * st.gazeY,
         abs.Head[1] - abs.Neck[1] + st.headLook, 0, 0, 0);
       setBone("Jaw", p.jaw * (0.6 + 0.4 * Math.sin(st.t * 1.3)), 0, 0, 0, 0);
 
@@ -142,8 +165,12 @@
       setBone("Lid_R", BLINK_UP * lidR, 0, 0, 0, 0);
       setBone("LidLow_L", -BLINK_LOW * Math.max(0, lidL), 0, 0, 0, 0);
       setBone("LidLow_R", -BLINK_LOW * Math.max(0, lidR), 0, 0, 0, 0);
-      setBone("Eye_L", 0, st.look, 0, 0, 0);
-      setBone("Eye_R", 0, st.look, 0, 0, 0);
+      // Pupilles : glissent sur l'œil (avant / arrière et un peu haut / bas) en suivant sa courbure.
+      const g = Math.max(-1, Math.min(1, st.gazeX));
+      const gx = g * (g > 0 ? GAZE_FWD : GAZE_BACK), gy = Math.max(-1, Math.min(1, st.gazeY)) * GAZE_Y;
+      const depth = EYE.D * (Math.sqrt(Math.max(0, 1 - (gx / EYE.L) * (gx / EYE.L))) - 1);
+      setBone("Pupil_L", 0, 0, 0, gy, depth, PUPIL_FWD.L * gx);
+      setBone("Pupil_R", 0, 0, 0, gy, depth, PUPIL_FWD.R * gx);
 
       // Crinière, moustaches, barbichette : flottent, se soulèvent en vol et traînent derrière les mouvements
       // de la tête.

@@ -240,7 +240,8 @@ def main():
 
     rig = {"name": name, "tris": a.tri_count(), "bones": order,
            "parents": {n: a.bones[n]["parent"] for n in order},
-           "blink_up_rad": round(a.blink_up, 3), "blink_low_rad": round(a.blink_low, 3), "parts": stats}
+           "blink_up_rad": round(a.blink_up, 3), "blink_low_rad": round(a.blink_low, 3),
+           "eye": {k: round(v, 3) for k, v in a.eye_geom.items()}, "pupil_forward": a.eye_fwd, "parts": stats}
     with open(os.path.join(OUT, name + ".json"), "w") as fh:
         json.dump(rig, fh, indent=2, ensure_ascii=False)
     print(path, len(order), "os", a.tri_count(), "triangles", os.path.getsize(path) // 1024, "Ko")

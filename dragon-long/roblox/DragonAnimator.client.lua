@@ -14,7 +14,7 @@ Ce qui est animé :
     vers la queue, de même amplitude partout), puis on en déduit l'angle de chaque os. Le corps est recentré
     pour que tête, milieu et queue ondulent ensemble. En vol : longue vague souple, un peu en spirale ;
   - tête : suit la vague en plus calme, regarde autour d'elle au repos, mâchoire qui respire ;
-  - yeux : regard qui se déplace ; clignements avec de vraies paupières (haut et bas) qui glissent sur l'œil :
+  - yeux : la pupille glisse sur l'œil par petits sauts rapides (le regard), la tête suit ; clignements avec de vraies paupières (haut et bas) qui glissent sur l'œil :
     fermeture rapide, réouverture plus lente avec un petit rebond, parfois double, parfois lent au repos ;
   - crinière, moustaches, barbichette : flottent, plus fort en vol ;
   - pattes : marche en diagonale, repliées vers l'arrière en vol.
@@ -28,6 +28,10 @@ local TAG = "DragonLong"
 local MAX_DISTANCE = 400 -- au-delà, on n'anime pas (économie)
 local BLINK_UP = 1.449  -- fermeture de la paupière du haut (rad, elle glisse vers le bas sur l'œil)
 local BLINK_LOW = 0.349 -- la paupière du bas remonte à sa rencontre
+local EYE_L, EYE_D = 0.78, 0.247 -- demi-longueur et profondeur de l'œil (studs)
+-- Course de la pupille sur l'œil (studs) : moins vers l'avant, où l'œil s'enfonce sous l'arcade près du nez.
+local GAZE_FWD, GAZE_BACK, GAZE_Y = 0.15, 0.34, 0.07
+local PUPIL_FWD_L, PUPIL_FWD_R = -1, 1 -- sens « vers l'avant » de l'axe X de chaque pupille
 local SEG = 0.8         -- longueur du corps par pas de colonne (studs)
 local KAPPA = 0.11      -- nombre d'onde : ~1,3 vague sur toute la longueur du corps
 
@@ -83,7 +87,8 @@ local function newState(model)
 		model = model, bones = collectBones(model), p = p,
 		phase = rng:NextNumber(0, 6), step = 0, flutter = 0, t = 0,
 		blinkIn = rng:NextNumber(1, 4), blink = nil,
-		look = 0, lookTarget = 0, lookIn = 1.5, headLook = 0, headTarget = 0,
+		headLook = 0, headTarget = 0,
+		gazeX = 0, gazeY = 0, gazeTx = 0, gazeTy = 0, gazeIn = 1, microX = 0, microY = 0, microIn = 0.5,
 	}
 end
 
@@ -187,16 +192,33 @@ local function update(st, dt)
 		end
 	end
 
-	-- Tête : suit la vague (en plus calme) et regarde autour d'elle au repos.
-	st.lookIn -= dt
-	if st.lookIn <= 0 then
-		st.lookIn = rng:NextNumber(1.5, 4)
-		st.lookTarget = rng:NextNumber(-0.2, 0.2)
+	-- Regard : la pupille saute vite vers un nouveau point (~80 ms), s'y fixe, avec de petits micro-mouvements.
+	-- Au repos le dragon regarde partout et la tête suit le regard avec un temps de retard ; en marche et en vol
+	-- il regarde surtout devant. Un grand changement de regard s'accompagne parfois d'un clignement.
+	st.gazeIn -= dt
+	if st.gazeIn <= 0 then
+		local nx = (mode == "Idle") and rng:NextNumber(-1, 1) or rng:NextNumber(0.1, 1)
+		local ny = (mode == "Idle") and rng:NextNumber(-1, 1) or rng:NextNumber(-0.4, 0.4)
+		if math.abs(nx - st.gazeTx) > 0.8 and not st.blink and rng:NextNumber(0, 1) < 0.3 then
+			st.blink = { t = 0, close = 0.07, hold = 0.04, open = 0.15, twice = false }
+		end
+		st.gazeTx, st.gazeTy = nx, ny
+		st.gazeIn = rng:NextNumber(0.6, 3)
 		st.headTarget = (mode == "Idle") and rng:NextNumber(-0.25, 0.25) or 0
 	end
-	st.look += (st.lookTarget - st.look) * math.min(1, dt * 6)
+	st.microIn -= dt
+	if st.microIn <= 0 then
+		st.microIn = rng:NextNumber(0.25, 0.7)
+		st.microX = rng:NextNumber(-0.07, 0.07)
+		st.microY = rng:NextNumber(-0.07, 0.07)
+	end
+	local gk = math.min(1, dt * 28)
+	st.gazeX += (st.gazeTx + st.microX - st.gazeX) * gk
+	st.gazeY += (st.gazeTy + st.microY - st.gazeY) * gk
 	st.headLook += (st.headTarget - st.headLook) * math.min(1, dt * 1.5)
-	setBone(st, "Head", ax.Head - ax.Neck + 0.04 * math.sin(st.t * 0.9), ay.Head - ay.Neck + st.headLook, 0)
+
+	-- Tête : suit la vague (en plus calme), suit le regard avec retard et lève ou baisse un peu le nez avec lui.
+	setBone(st, "Head", ax.Head - ax.Neck + 0.04 * math.sin(st.t * 0.9) - 0.06 * st.gazeY, ay.Head - ay.Neck + st.headLook, 0)
 	setBone(st, "Jaw", p.jaw * (0.6 + 0.4 * math.sin(st.t * 1.3)), 0, 0)
 
 	-- Clignement : fermeture très rapide, courte pause, réouverture plus lente avec un léger rebond.
@@ -227,8 +249,13 @@ local function update(st, dt)
 	setBone(st, "Lid_R", BLINK_UP * lidR, 0, 0)
 	setBone(st, "LidLow_L", -BLINK_LOW * math.max(0, lidL), 0, 0)
 	setBone(st, "LidLow_R", -BLINK_LOW * math.max(0, lidR), 0, 0)
-	setBone(st, "Eye_L", 0, st.look, 0)
-	setBone(st, "Eye_R", 0, st.look, 0)
+	-- Pupilles : glissent sur l'œil (avant / arrière et un peu haut / bas) en suivant sa courbure.
+	local g = math.clamp(st.gazeX, -1, 1)
+	local gx = g * (g > 0 and GAZE_FWD or GAZE_BACK)
+	local gy = math.clamp(st.gazeY, -1, 1) * GAZE_Y
+	local depth = EYE_D * (math.sqrt(math.max(0, 1 - (gx / EYE_L) ^ 2)) - 1)
+	setBone(st, "Pupil_L", 0, 0, 0, gy, depth, PUPIL_FWD_L * gx)
+	setBone(st, "Pupil_R", 0, 0, 0, gy, depth, PUPIL_FWD_R * gx)
 
 	-- Crinière, moustaches, barbichette : flottent, se soulèvent en vol et traînent derrière les mouvements
 	-- de la tête.

@@ -35,9 +35,11 @@
     "Jaw",
     "Eye_L",
     "Lid_L",
+    "Pupil_L",
     "LidLow_L",
     "Eye_R",
     "Lid_R",
+    "Pupil_R",
     "LidLow_R",
     "Mane_L",
     "Mane_R",
@@ -80,9 +82,11 @@
     "Jaw": "Head",
     "Eye_L": "Head",
     "Lid_L": "Head",
+    "Pupil_L": "Eye_L",
     "LidLow_L": "Head",
     "Eye_R": "Head",
     "Lid_R": "Head",
+    "Pupil_R": "Eye_R",
     "LidLow_R": "Head",
     "Mane_L": "Head",
     "Mane_R": "Head",
@@ -93,6 +97,15 @@
   },
   "blink_up_rad": 1.449,
   "blink_low_rad": 0.349,
+  "eye": {
+    "L": 0.78,
+    "Hh": 0.312,
+    "D": 0.247
+  },
+  "pupil_forward": {
+    "L": -1,
+    "R": 1
+  },
   "parts": {
     "Body": {
       "tris": 15674,

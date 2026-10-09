@@ -1,7 +1,8 @@
 # Dragon Long (dragon chinois) stylisé, low-poly.
 # v1 : premier croquis. v2 : écailles en relief sur le dos, plaques sur le ventre, crête plus fournie, yeux retravaillés.
 # v3 : tête plus grande et sculptée (nez de félin, sourcils dorés en volutes, barbichette, joues, rides du museau).
-# v19 : vraies paupières en coque (haut et bas) qui glissent sur l'œil pour cligner.
+# v19 : vraies paupières en coque (haut et bas) qui glissent sur l'œil pour cligner ; pupilles sur leur propre os
+#       pour le regard.
 # v18 : crête du dos et queue en mèches de flammes (même style que la crinière), écailles du corps couchées en tuiles.
 # v17 : cornes à anneaux et 2 branches, pattes musclées (épaule, coude en flammes, pied à 3 doigts griffus),
 #       crinière et joues en mèches de flammes épaisses.
@@ -276,8 +277,15 @@ def build_eye(a, P, f, u, side_v, S):
     rings.append(c + e1 * L)
     a.add("Eyes", *loft(rings))
 
-    # Pupille fendue, verticale.
-    a.add("Pupils", *gem(c + out * D * 0.95 + e1 * L * 0.05, e1, e2, out, 0.07 * S, Hh * 0.9, 0.06 * S))
+    # Pupille fendue, verticale, sur son propre os : elle glisse sur l'œil pour donner la direction du regard.
+    pc = c + out * D * 0.95 + e1 * L * 0.05
+    a.bone("Pupil_" + nm, pc, "Eye_" + nm, eye_frame)
+    a.gid = a.new_group("bone", bone="Pupil_" + nm)
+    a.add("Pupils", *gem(pc, e1, e2, out, 0.07 * S, Hh * 0.9, 0.06 * S))
+    # Pour l'animation : taille de l'œil et sens « vers l'avant » de l'axe X de la pupille (-1 ou 1).
+    a.eye_geom = {"L": float(L), "Hh": float(Hh), "D": float(D)}
+    a.eye_fwd = getattr(a, "eye_fwd", {})
+    a.eye_fwd[nm] = 1 if eye_frame[0] @ f > 0 else -1
 
     # Paupières en coque : des morceaux de « coquille » courbe, centrés sur l'œil (surface de révolution autour
     # de son grand axe). En tournant autour de cet axe, elles glissent sur l'œil comme un volet, sans le quitter.
