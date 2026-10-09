@@ -18,7 +18,8 @@ Ce qui est animé :
     fermeture rapide, réouverture plus lente avec un petit rebond, parfois double, parfois lent au repos ;
   - crinière, moustaches, barbichette : flottent, plus fort en vol ;
   - pattes : marche en diagonale, repliées vers l'arrière en vol ;
-  - actions (attribut « Action » du Model, réglé par un script serveur) : "Roar" (rugissement), "Bite" (morsure),
+  - actions (attribut « Action » du Model, réglé par un script serveur) : "Roar" (rugissement), "Bite" (morsure ;
+    elle vise la position donnée par l'attribut « Target » (Vector3) s'il existe, sinon tout droit),
     "Breath" (souffle, avec des particules qui sortent de la gueule). Le rugissement lance une onde de choc et fait
     trembler la caméra des joueurs proches. Pour relancer la même action, ajoute un
     numéro après un # : "Roar#1", "Roar#2"… Style du souffle : attribut « BreathStyle » = "fire" (par défaut),
@@ -63,8 +64,9 @@ local MODES = {
 }
 
 -- Actions ponctuelles : durée en secondes.
-local ACTIONS = { Roar = 3.3, Bite = 0.9, Breath = 3.2 }
-local ROAR_BURST = 0.62  -- instant du cri (onde de choc, tremblement de la caméra)
+local ACTIONS = { Roar = 3.3, Bite = 1.6, Breath = 3.2 }
+-- Instant fort de chaque action (cri du rugissement, claquement de la morsure) : effets et caméra.
+local BURSTS = { Roar = 0.62, Bite = 0.52 }
 local TURN_CURVE = 0.027 -- courbure du corps (rad par pas de colonne) pour 1 rad/s de virage
 local DEAD_DROP = 3.6    -- le dragon couché sur le flanc : le poitrail descend de tant de studs
 local MID = 34           -- milieu du corps (pas de colonne) : le corps se courbe autour de ce point
@@ -83,7 +85,7 @@ end
 -- Pose d'une action à l'instant t (voir demo/animator.js, même calcul).
 local function actionPose(name, t)
 	local o = { rear = 0, pitch = 0, yaw = 0, jaw = 0, push = 0, lift = 0, mane = 0, lash = 0, breath = 0,
-		cry = 0, shiver = 0, eyes = 0, sweep = 0 }
+		cry = 0, shiver = 0, eyes = 0, sweep = 0, coil = 0, aim = 0 }
 	if name == "Roar" then
 		-- 1. Se ramasse : tête basse, poitrail en arrière, gueule fermée.
 		local crouch = ramp(t, 0, 0.45) * (1 - ramp(t, 0.5, 0.65))
@@ -103,12 +105,28 @@ local function actionPose(name, t)
 		o.mane, o.lash = 0.8 * cry + 0.2 * high, 0.12 * cry
 		o.cry, o.shiver, o.eyes, o.sweep = cry, 0.035 * cry, cry, cry
 	elseif name == "Bite" then
-		-- Recule la tête, gueule ouverte, puis frappe vers l'avant et claque la mâchoire.
-		local wind = ramp(t, 0, 0.3) * (1 - ramp(t, 0.3, 0.42))
-		local strike = ramp(t, 0.3, 0.42) * (1 - ramp(t, 0.55, 0.9))
-		o.rear, o.pitch = 0.45 * wind - 0.3 * strike, -0.25 * wind + 0.3 * strike
-		o.jaw = 0.8 * ramp(t, 0.05, 0.28) * (1 - ramp(t, 0.44, 0.5))
-		o.push, o.mane = -0.9 * wind + 1.8 * strike, 0.3 * strike
+		-- Arrêt net à l'impact : le temps de la pose se fige 70 ms juste après le claquement.
+		local tt = (t < 0.53) and t or ((t < 0.6) and 0.53 or (t - 0.07))
+		-- 1. S'arme comme un serpent : cou replié en S, tête en arrière, crocs visibles, yeux fixés sur la cible.
+		local coil = ramp(tt, 0, 0.3) * (1 - ramp(tt, 0.34, 0.44))
+		-- 2. Frappe : tout l'avant du corps se projette, gueule ouverte au maximum juste avant l'impact.
+		local strike = ramp(tt, 0.34, 0.5) * (1 - ramp(tt, 0.62, 1.3))
+		-- 3. Petit rebond en arrière après l'impact.
+		local recoil = ramp(tt, 0.53, 0.62) * (1 - ramp(tt, 0.62, 0.85))
+		-- 4. Retour menaçant : tête basse, babines relevées, petit grognement.
+		local snarl = ramp(tt, 0.6, 0.8) * (1 - ramp(tt, 1.25, 1.53))
+		local open = ramp(tt, 0.3, 0.46) * (1 - ramp(tt, 0.48, 0.52))
+		local bounce = ramp(tt, 0.52, 0.56) * (1 - ramp(tt, 0.6, 0.7)) -- la mâchoire rebondit après le claquement
+		o.rear = 0.4 * coil - 0.25 * strike + 0.1 * snarl
+		o.pitch = -0.12 * coil + 0.22 * strike - 0.12 * recoil + 0.12 * snarl
+		o.push = -1.1 * coil + 2.6 * strike - 0.5 * recoil
+		o.lift = -0.25 * coil + 0.1 * strike
+		o.jaw = 0.15 * coil + 1.0 * open + 0.15 * bounce + 0.18 * snarl
+		o.yaw = 0.02 * math.sin(t * 45) * snarl
+		o.mane = 0.25 * coil + 0.35 * strike + 0.2 * snarl
+		o.eyes = 0.7 * math.max(coil, strike)
+		o.coil = coil
+		o.aim = ramp(tt, 0, 0.3) * (1 - ramp(tt, 1.0, 1.5))
 	elseif name == "Breath" then
 		-- Inspire (cou dressé, tête en arrière), puis souffle longtemps en balayant devant lui.
 		local inhale = ramp(t, 0, 0.9) * (1 - ramp(t, 0.9, 1.15))
@@ -184,7 +202,7 @@ local function newState(model)
 	return {
 		model = model, bones = collectBones(model), glow = collectGlow(model), p = p,
 		phase = rng:NextNumber(0, 6), step = 0, flutter = 0, pulse = 0, t = 0,
-		action = nil, actionT = 0, breath = 0, cry = 0, burst = false, turn = 0, deadT = 0, yaw = nil,
+		action = nil, actionT = 0, breath = 0, cry = 0, burst = nil, aimYaw = 0, aimPitch = 0, turn = 0, deadT = 0, yaw = nil,
 		blinkIn = rng:NextNumber(1, 4), blink = nil,
 		headLook = 0, headTarget = 0,
 		gazeX = 0, gazeY = 0, gazeTx = 0, gazeTy = 0, gazeIn = 1, microX = 0, microY = 0, microIn = 0.5,
@@ -244,10 +262,28 @@ local function closure(b, tt, one)
 	return closeOnce(b, tt)
 end
 
+-- Direction de la cible (attribut « Target », une position Vector3 dans le monde) vue depuis la tête du
+-- dragon, dans son propre repère (la tête regarde vers +Z) : angle à gauche (+) / droite, en haut (+) / bas.
+local function aimAt(st)
+	local target = st.model:GetAttribute("Target")
+	local head = st.bones.Head and st.bones.Head[1]
+	if typeof(target) ~= "Vector3" or not head then
+		return 0, 0
+	end
+	local v = st.model:GetPivot():VectorToObjectSpace(target - head.WorldPosition)
+	return math.atan2(v.X, v.Z), math.atan2(v.Y, math.sqrt(v.X * v.X + v.Z * v.Z))
+end
+
 -- Lance une action ponctuelle (Roar, Bite, Breath). Ignorée si le dragon est mort.
+-- La morsure vise la cible donnée par l'attribut « Target » (sinon, tout droit).
 local function play(st, name)
 	if ACTIONS[name] and st.p.dead < 0.5 then
 		st.action, st.actionT = name, 0
+		local y, p = 0, 0
+		if name == "Bite" then
+			y, p = aimAt(st)
+		end
+		st.aimYaw, st.aimPitch = math.clamp(y, -0.8, 0.8), math.clamp(p, -0.5, 0.5)
 	end
 end
 
@@ -291,8 +327,10 @@ local function update(st, dt, turn)
 	end
 	st.breath = act.breath
 	st.cry = act.cry
-	-- Instant du cri (onde de choc, tremblement de la caméra) : vrai pendant une seule image.
-	st.burst = st.action == "Roar" and st.actionT >= ROAR_BURST and st.actionT - dt < ROAR_BURST
+	-- Instant fort de l'action (cri, claquement) : nom de l'action pendant une seule image, sinon nil.
+	local bt = st.action and BURSTS[st.action]
+	st.burst = (bt and st.actionT >= bt and st.actionT - dt < bt) and st.action or nil
+	local aimY, aimP = st.aimYaw * act.aim, st.aimPitch * act.aim
 	local d = p.dead
 	-- Frisson quand il tombe : une dernière vague rapide qui s'éteint.
 	local shiver = 0.1 * math.sin(st.deadT * 16) * math.exp(-st.deadT * 2.2) * d
@@ -310,11 +348,13 @@ local function update(st, dt, turn)
 	for _, b in ipairs(SPINE) do
 		local name, sp = b[1], b[2]
 		local front = 1 - ramp(sp, 4, 20) -- 1 pour la tête et le cou, 0 dès le poitrail
-		ax[name] += -act.rear * front + 0.022 * d * (14 - sp)
+		ax[name] += -act.rear * front + 0.022 * d * (14 - sp) - 0.5 * aimP * front -- le cou vise la cible
 		ay[name] += TURN_CURVE * st.turn * (MID - sp) * (1 - d) + shiver * math.sin(sp * 0.3)
 			+ act.lash * ramp(sp, 30, 60) * math.sin(st.t * 9 - sp * 0.15)
 			+ act.shiver * math.sin(st.t * 38 - sp * 0.4) -- frisson du cri, de la tête à la queue
 			+ act.yaw * 0.5 * front -- le cou suit la secousse de la tête
+			+ 0.6 * aimY * front -- le cou se tourne vers la cible
+			+ 0.3 * act.coil * front * math.sin(sp * 0.45) -- cou replié en S avant de frapper
 	end
 
 	-- 2. Recentrage : position (haut/bas, côté) de chaque articulation par rapport au poitrail.
@@ -375,8 +415,8 @@ local function update(st, dt, turn)
 
 	-- Tête : suit la vague (en plus calme), suit le regard avec retard et lève ou baisse un peu le nez avec lui.
 	-- En virage, la tête regarde à l'intérieur ; mort, elle retombe, gueule entrouverte.
-	setBone(st, "Head", ax.Head - ax.Neck + (0.04 * math.sin(st.t * 0.9) - 0.06 * st.gazeY) * (1 - d) + act.pitch + 0.25 * d,
-		ay.Head - ay.Neck + st.headLook * (1 - d) + act.yaw + 0.45 * st.turn * (1 - d), 0)
+	setBone(st, "Head", ax.Head - ax.Neck + (0.04 * math.sin(st.t * 0.9) - 0.06 * st.gazeY) * (1 - d) + act.pitch + 0.25 * d
+		- 0.5 * aimP, ay.Head - ay.Neck + st.headLook * (1 - d) + act.yaw + 0.45 * st.turn * (1 - d) + 0.4 * aimY, 0)
 	setBone(st, "Jaw", math.max(p.jaw * (0.6 + 0.4 * math.sin(st.t * 1.3)), act.jaw) + 0.2 * d, 0, 0)
 
 	-- Clignement : fermeture très rapide, courte pause, réouverture plus lente avec un léger rebond.
@@ -562,6 +602,37 @@ local function updateShocks(dt)
 	end
 end
 
+-- Morsure : gerbe d'étincelles au claquement des crocs (émetteur ponctuel dans l'os de la mâchoire) et petite
+-- secousse de la caméra.
+local function startBiteFx(st)
+	local jaw = st.bones.Jaw and st.bones.Jaw[1]
+	if not jaw then
+		return
+	end
+	local fx = st.biteFx
+	if not fx then
+		fx = Instance.new("ParticleEmitter")
+		fx.Name = "DragonBiteSparks"
+		fx.Rate = 0 -- seulement des gerbes ponctuelles (Emit)
+		fx.EmissionDirection = Enum.NormalId.Back
+		fx.SpreadAngle = Vector2.new(180, 180)
+		fx.Speed = NumberRange.new(8, 20)
+		fx.Acceleration = Vector3.new(0, -30, 0)
+		fx.Lifetime = NumberRange.new(0.3, 0.5)
+		fx.LightEmission = 1
+		fx.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 0) })
+		fx.Parent = jaw
+		st.biteFx = fx
+	end
+	fx.Color = ColorSequence.new(Color3.fromHex(SHOCK_COLORS[st.model:GetAttribute("BreathStyle") or "fire"] or SHOCK_COLORS.fire))
+	fx:Emit(40)
+	local cam = workspace.CurrentCamera
+	if cam then
+		local dist = (cam.CFrame.Position - jaw.WorldPosition).Magnitude
+		shake.t, shake.strength = 0, 0.35 * math.clamp(1 - dist / 60, 0, 1)
+	end
+end
+
 RunService:BindToRenderStep("DragonRoarShake", Enum.RenderPriority.Camera.Value + 1, function(dt)
 	shake.t += dt
 	local cam = workspace.CurrentCamera
@@ -621,8 +692,10 @@ RunService.RenderStepped:Connect(function(dt)
 		elseif cam and (model:GetPivot().Position - cam.CFrame.Position).Magnitude < MAX_DISTANCE then
 			update(st, dt, turnRate(st, dt))
 			updateBreath(st)
-			if st.burst then
+			if st.burst == "Roar" then
 				startRoarFx(st)
+			elseif st.burst == "Bite" then
+				startBiteFx(st)
 			end
 		else
 			st.yaw = nil -- trop loin : on repartira de zéro pour le calcul du virage

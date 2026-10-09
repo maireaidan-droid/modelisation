@@ -208,6 +208,13 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
   // Souffle de feu : particules qui sortent de la gueule pendant l'action « Souffle ».
   const breath = DragonEffects.createBreath(THREE, scene);
   const shock = DragonEffects.createShockwave(THREE, scene), shake = DragonEffects.createShake();
+  const biteSparks = DragonEffects.createSparks(THREE, scene);
+  // Cible de la morsure : une petite boule lumineuse placée au hasard devant le dragon (gauche, droite, haut, bas).
+  const targetBall = new THREE.Mesh(new THREE.IcosahedronGeometry(0.9, 1),
+    new THREE.MeshBasicMaterial({ color: 0xff5a5a, transparent: true, opacity: 0.9 }));
+  targetBall.visible = false;
+  let targetLife = 0;
+  const TARGETS = [[-8, 12, 28], [8, 12, 28], [0, 17, 27], [0, 7, 27], [0, 12, 30]];
   const shakeOff = new THREE.Vector3();
   const mouthW = new THREE.Vector3(), headQ = new THREE.Quaternion(), breathDir = new THREE.Vector3();
   function setBone(name, rx, ry, rz, ty, tz, tx) {
@@ -245,6 +252,7 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
     camera.fov = w < 600 ? 50 : 38;
     camera.updateProjectionMatrix();
     breath.setScale(h * 0.03);
+    biteSparks.setScale(h * 0.03);
   }
   window.addEventListener("resize", resize);
   resize();
@@ -303,7 +311,18 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
     });
   });
   document.querySelectorAll("[data-action]").forEach(function (b) {
-    b.addEventListener("click", function () { if (anim) anim.play(b.dataset.action); });
+    b.addEventListener("click", function () {
+      if (!anim) return;
+      if (b.dataset.action !== "Bite") return anim.play(b.dataset.action);
+      // Morsure : on pose une cible au hasard devant lui, il vise la tête vers elle.
+      const t = TARGETS[(Math.random() * TARGETS.length) | 0];
+      if (!targetBall.parent) pivot.add(targetBall);
+      targetBall.position.set(t[0], t[1], t[2]);
+      targetLife = 1.6;
+      scene.updateMatrixWorld();
+      const aim = DragonEffects.aimAt(THREE, pivot, bones.Head, targetBall.getWorldPosition(new THREE.Vector3()));
+      anim.play("Bite", aim[0], aim[1]);
+    });
   });
   document.querySelectorAll("[data-view]").forEach(function (b) {
     b.addEventListener("click", function () { goTo(b.dataset.view); });
@@ -345,9 +364,13 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
         breathDir.set(0, -0.12, 1).applyQuaternion(headQ).normalize();
         breath.update(reduceMotion ? 0 : dt, anim.state.breath, mouthW, breathDir);
         // Rugissement : onde de choc et tremblement de la caméra à l'instant du cri.
-        if (anim.state.burst && !reduceMotion) {
+        if (anim.state.burst === "Roar" && !reduceMotion) {
           shock.trigger(mouthW, breathDir, "#FFB070");
           shake.trigger(0.9);
+        }
+        if (anim.state.burst === "Bite" && !reduceMotion) {   // claquement des crocs : étincelles, petite secousse
+          biteSparks.trigger(mouthW, "#FFB070");
+          shake.trigger(0.35);
         }
       }
     }
@@ -367,6 +390,9 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
     }
     controls.update();
     shock.update(reduceMotion ? 0 : dt);
+    biteSparks.update(reduceMotion ? 0 : dt);
+    targetLife -= dt;
+    targetBall.visible = targetLife > 0;
     shake.offset(dt, shakeOff);                // la caméra tremble un instant, puis revient à sa place
     camera.position.add(shakeOff);
     renderer.render(scene, camera);

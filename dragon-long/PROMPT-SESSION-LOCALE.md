@@ -87,6 +87,10 @@ Fichiers fournis avec le modèle : `DragonAnimator.client.lua` et `DragonDemo.se
 - **Actions** : un script serveur règle l'attribut `Action` du Model : `"Roar"` (rugissement), `"Bite"` (morsure),
   `"Breath"` (souffle). Pour relancer la même action, ajoute `#` et un numéro qui change : `"Roar#1"`, `"Roar#2"`…
   (`DragonDemo` le fait avec sa fonction `playAction`).
+- **Morsure visée** : avant `"Bite"`, règle l'attribut `Target` (une position `Vector3`, par exemple celle du
+  `HumanoidRootPart` du joueur visé) : la tête part vers lui. Sans `Target`, il mord tout droit.
+- **Effets** : le rugissement lance une onde de choc et fait trembler la caméra des joueurs proches ; la morsure fait
+  jaillir des étincelles au claquement des crocs (petite secousse de caméra).
 - **Souffle** : des particules sortent de la gueule (créées chez chaque joueur dans l'os `Jaw`). L'attribut
   `BreathStyle` choisit les couleurs : `"fire"` (par défaut), `"ice"`, `"gold"`, `"void"`.
 - **Virages** : rien à faire, `DragonAnimator` les déduit de la rotation du Model ; le corps se courbe, la tête regarde

@@ -74,7 +74,8 @@ Le Mythique a en plus 8 os `Crest1`…`Crest8` (cristaux flottants) et des parti
 - `roblox/DragonAnimator.client.lua` (LocalScript, StarterPlayerScripts) anime les os ; l'attribut `Mode` du Model choisit `Idle`, `Walk` ou `Fly`.
 - `roblox/DragonDemo.server.lua` (Script, ServerScriptService, optionnel) fait enchaîner repos, marche et vol en cercle.
 - `demo/animator.js` est la même logique en JavaScript, utilisée par la démo web (`demo/effects.js` : particules du souffle).
-- Actions (attribut `Action` du Model) : `Roar` (rugissement), `Bite` (morsure), `Breath` (souffle ; style avec l'attribut
+- Actions (attribut `Action` du Model) : `Roar` (rugissement, onde de choc), `Bite` (morsure ; vise l'attribut `Target`
+  s'il est réglé, étincelles au claquement), `Breath` (souffle ; style avec l'attribut
   `BreathStyle` = `fire`, `ice`, `gold`, `void`). Mode `Dead` : il s'effondre sur le flanc. Les virages sont déduits tout
   seuls de la rotation du Model : le corps se courbe, la tête regarde dans le virage, il s'incline en vol.
 

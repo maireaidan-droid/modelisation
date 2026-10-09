@@ -132,6 +132,57 @@
     };
   }
 
+  // Étincelles de la morsure : une gerbe qui jaillit dans toutes les directions au claquement des crocs.
+  function createSparks(THREE, scene) {
+    const n = 90, geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(n * 3), vel = new Float32Array(n * 3), alpha = new Float32Array(n), age = new Float32Array(n).fill(9);
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("alpha", new THREE.BufferAttribute(alpha, 1));
+    const mat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      uniforms: { uColor: { value: new THREE.Color(1, 0.8, 0.5) }, uScale: { value: 1 } },
+      vertexShader: "attribute float alpha; varying float vA; uniform float uScale; void main(){ vA = alpha;" +
+        "vec4 mv = modelViewMatrix * vec4(position,1.0); gl_PointSize = uScale * 75.0 / -mv.z; gl_Position = projectionMatrix * mv; }",
+      fragmentShader: "uniform vec3 uColor; varying float vA; void main(){ float r = length(gl_PointCoord - 0.5);" +
+        "float a = smoothstep(0.5, 0.0, r) * vA; gl_FragColor = vec4(uColor * (1.0 + 2.0 * smoothstep(0.25, 0.0, r)) * a, a); }"
+    });
+    const pts = new THREE.Points(geo, mat);
+    pts.frustumCulled = false;
+    scene.add(pts);
+    return {
+      trigger: function (origin, color) {
+        mat.uniforms.uColor.value.set(color).convertSRGBToLinear();
+        for (let i = 0; i < n; i++) {
+          age[i] = 0;
+          pos[i * 3] = origin.x; pos[i * 3 + 1] = origin.y; pos[i * 3 + 2] = origin.z;
+          const u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, k = Math.sqrt(1 - u * u), sp = 8 + Math.random() * 12;
+          vel[i * 3] = k * Math.cos(th) * sp; vel[i * 3 + 1] = u * sp + 4; vel[i * 3 + 2] = k * Math.sin(th) * sp;
+        }
+      },
+      update: function (dt) {
+        for (let i = 0; i < n; i++) {
+          age[i] += dt;
+          const q = age[i] / 0.45;
+          if (q >= 1) { alpha[i] = 0; continue; }
+          vel[i * 3 + 1] -= 30 * dt;                            // retombent
+          pos[i * 3] += vel[i * 3] * dt; pos[i * 3 + 1] += vel[i * 3 + 1] * dt; pos[i * 3 + 2] += vel[i * 3 + 2] * dt;
+          alpha[i] = 1 - q;
+        }
+        geo.attributes.position.needsUpdate = true;
+        geo.attributes.alpha.needsUpdate = true;
+      },
+      setScale: function (s) { mat.uniforms.uScale.value = s; }
+    };
+  }
+
+  // Direction d'une cible vue par le dragon : angle à gauche (+) / droite et en haut (+) / bas, depuis la tête,
+  // dans le repère du dragon (pivot = Object3D qui le porte, la tête regarde vers +Z).
+  function aimAt(THREE, pivot, head, target) {
+    const h = pivot.worldToLocal(head.getWorldPosition(new THREE.Vector3()));
+    const t = pivot.worldToLocal(target.clone()).sub(h);
+    return [Math.atan2(t.x, t.z), Math.atan2(t.y, Math.hypot(t.x, t.z))];
+  }
+
   // Tremblement de la caméra : décalage aléatoire qui s'éteint. strength = force au départ (studs).
   function createShake() {
     let t = 99, strength = 0;
@@ -147,5 +198,6 @@
   }
 
   global.DragonEffects = { createBreath: createBreath, createShockwave: createShockwave, createShake: createShake,
+                           createSparks: createSparks, aimAt: aimAt,
                            mouthInHead: mouthInHead, PRESETS: PRESETS };
 })(window);

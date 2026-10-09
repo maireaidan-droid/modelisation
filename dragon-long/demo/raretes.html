@@ -247,6 +247,13 @@ body {
 
   const breath = DragonEffects.createBreath(THREE, scene);   // souffle (feu, glace, or ou néant)
   const shock = DragonEffects.createShockwave(THREE, scene), shake = DragonEffects.createShake();
+  const biteSparks = DragonEffects.createSparks(THREE, scene);
+  // Cible de la morsure : une petite boule lumineuse placée au hasard devant le dragon (gauche, droite, haut, bas).
+  const targetBall = new THREE.Mesh(new THREE.IcosahedronGeometry(0.9, 1),
+    new THREE.MeshBasicMaterial({ color: 0xff5a5a, transparent: true, opacity: 0.9 }));
+  targetBall.visible = false;
+  let targetLife = 0;
+  const TARGETS = [[-8, 12, 28], [8, 12, 28], [0, 17, 27], [0, 7, 27], [0, 12, 30]];
   const shakeOff = new THREE.Vector3();
   const SHOCK_COLORS = { fire: "#FFB070", ice: "#9FEFFF", gold: "#FFE08A", void: "#FF6FE4" };
   const controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -268,6 +275,7 @@ body {
     camera.updateProjectionMatrix();
     sparkMat.uniforms.uScale.value = h * 0.03;     // taille des étincelles en pixels, suivant la hauteur de l'écran
     breath.setScale(h * 0.03);
+    biteSparks.setScale(h * 0.03);
   }
   window.addEventListener("resize", resize);
 
@@ -623,7 +631,18 @@ body {
   // ---------- Souffle : feu, glace, or ou néant selon la rareté ----------
   const mouthW = new THREE.Vector3(), headQ = new THREE.Quaternion(), breathDir = new THREE.Vector3();
   document.querySelectorAll("[data-action]").forEach(function (b) {
-    b.addEventListener("click", function () { if (currentEntry) currentEntry.anim.play(b.dataset.action); });
+    b.addEventListener("click", function () {
+      if (!currentEntry) return;
+      if (b.dataset.action !== "Bite") return currentEntry.anim.play(b.dataset.action);
+      // Morsure : on pose une cible au hasard devant lui, il vise la tête vers elle.
+      const t = TARGETS[(Math.random() * TARGETS.length) | 0];
+      if (!targetBall.parent) pivot.add(targetBall);
+      targetBall.position.set(t[0], t[1], t[2]);
+      targetLife = 1.6;
+      scene.updateMatrixWorld();
+      const aim = DragonEffects.aimAt(THREE, pivot, currentEntry.bones.Head, targetBall.getWorldPosition(new THREE.Vector3()));
+      currentEntry.anim.play("Bite", aim[0], aim[1]);
+    });
   });
 
   // ---------- Boucle ----------
@@ -650,10 +669,14 @@ body {
       breath.setStyle(current ? current.breath : "fire");
       breath.update(reduceMotion ? 0 : dt, currentEntry.anim.state.breath, mouthW, breathDir);
       // Rugissement : onde de choc (couleur de la rareté) et tremblement de la caméra à l'instant du cri.
-      if (currentEntry.anim.state.burst && !reduceMotion) {
-        shock.trigger(mouthW, breathDir, SHOCK_COLORS[current ? current.breath : "fire"]);
-        shake.trigger(0.9);
-      }
+      if (currentEntry.anim.state.burst === "Roar" && !reduceMotion) {
+          shock.trigger(mouthW, breathDir, SHOCK_COLORS[current ? current.breath : "fire"]);
+          shake.trigger(0.9);
+        }
+        if (currentEntry.anim.state.burst === "Bite" && !reduceMotion) {   // claquement des crocs : étincelles, petite secousse
+          biteSparks.trigger(mouthW, SHOCK_COLORS[current ? current.breath : "fire"]);
+          shake.trigger(0.35);
+        }
       if (flyW > 0.01) {
         followPrev.copy(controls.target);
         controls.target.lerp(followVec.copy(pivot.position).add(followOffset), Math.min(1, dt * 2.5));
@@ -672,6 +695,9 @@ body {
     if (current && current.eyeGlow) updateEyeHalos();
     controls.update();
     shock.update(reduceMotion ? 0 : dt);
+    biteSparks.update(reduceMotion ? 0 : dt);
+    targetLife -= dt;
+    targetBall.visible = targetLife > 0;
     shake.offset(dt, shakeOff);                // la caméra tremble un instant, puis revient à sa place
     camera.position.add(shakeOff);
     renderer.render(scene, camera);

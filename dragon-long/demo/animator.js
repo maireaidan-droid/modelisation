@@ -34,8 +34,9 @@
   };
 
   // Actions ponctuelles (lancées par play(nom)) : durée en secondes.
-  const ACTIONS = { Roar: 3.3, Bite: 0.9, Breath: 3.2 };
-  const ROAR_BURST = 0.62;   // instant du cri (onde de choc, tremblement de la caméra)
+  const ACTIONS = { Roar: 3.3, Bite: 1.6, Breath: 3.2 };
+  // Instant fort de chaque action (cri du rugissement, claquement de la morsure) : effets et caméra.
+  const BURSTS = { Roar: 0.62, Bite: 0.52 };
   const TURN_CURVE = 0.027;  // courbure du corps (rad par pas de colonne) pour 1 rad/s de virage
   const DEAD_DROP = 3.6;     // le dragon couché sur le flanc : le poitrail descend de tant de studs
   const MID = 34;            // milieu du corps (pas de colonne) : le corps se courbe autour de ce point
@@ -51,7 +52,7 @@
   // shiver = frisson qui parcourt le corps, eyes = yeux grands ouverts (0 à 1), sweep = moustaches plaquées.
   function actionPose(name, t) {
     const o = { rear: 0, pitch: 0, yaw: 0, jaw: 0, push: 0, lift: 0, mane: 0, lash: 0, breath: 0,
-                cry: 0, shiver: 0, eyes: 0, sweep: 0 };
+                cry: 0, shiver: 0, eyes: 0, sweep: 0, coil: 0, aim: 0 };
     if (name === "Roar") {
       // 1. Se ramasse : tête basse, poitrail en arrière, gueule fermée.
       const crouch = ramp(t, 0, 0.45) * (1 - ramp(t, 0.5, 0.65));
@@ -76,12 +77,28 @@
       o.eyes = cry;
       o.sweep = cry;
     } else if (name === "Bite") {
-      // Recule la tête, gueule ouverte, puis frappe vers l'avant et claque la mâchoire.
-      const wind = ramp(t, 0, 0.3) * (1 - ramp(t, 0.3, 0.42));
-      const strike = ramp(t, 0.3, 0.42) * (1 - ramp(t, 0.55, 0.9));
-      o.rear = 0.45 * wind - 0.3 * strike; o.pitch = -0.25 * wind + 0.3 * strike;
-      o.jaw = 0.8 * ramp(t, 0.05, 0.28) * (1 - ramp(t, 0.44, 0.5));
-      o.push = -0.9 * wind + 1.8 * strike; o.mane = 0.3 * strike;
+      // Arrêt net à l'impact : le temps de la pose se fige 70 ms juste après le claquement.
+      const tt = t < 0.53 ? t : (t < 0.6 ? 0.53 : t - 0.07);
+      // 1. S'arme comme un serpent : cou replié en S, tête en arrière, crocs visibles, yeux fixés sur la cible.
+      const coil = ramp(tt, 0, 0.3) * (1 - ramp(tt, 0.34, 0.44));
+      // 2. Frappe : tout l'avant du corps se projette, gueule ouverte au maximum juste avant l'impact.
+      const strike = ramp(tt, 0.34, 0.5) * (1 - ramp(tt, 0.62, 1.3));
+      // 3. Petit rebond en arrière après l'impact.
+      const recoil = ramp(tt, 0.53, 0.62) * (1 - ramp(tt, 0.62, 0.85));
+      // 4. Retour menaçant : tête basse, babines relevées, petit grognement.
+      const snarl = ramp(tt, 0.6, 0.8) * (1 - ramp(tt, 1.25, 1.53));
+      const open = ramp(tt, 0.3, 0.46) * (1 - ramp(tt, 0.48, 0.52));
+      const bounce = ramp(tt, 0.52, 0.56) * (1 - ramp(tt, 0.6, 0.7));    // la mâchoire rebondit après le claquement
+      o.rear = 0.4 * coil - 0.25 * strike + 0.1 * snarl;
+      o.pitch = -0.12 * coil + 0.22 * strike - 0.12 * recoil + 0.12 * snarl;
+      o.push = -1.1 * coil + 2.6 * strike - 0.5 * recoil;
+      o.lift = -0.25 * coil + 0.1 * strike;
+      o.jaw = 0.15 * coil + 1.0 * open + 0.15 * bounce + 0.18 * snarl;
+      o.yaw = 0.02 * Math.sin(t * 45) * snarl;
+      o.mane = 0.25 * coil + 0.35 * strike + 0.2 * snarl;
+      o.eyes = 0.7 * Math.max(coil, strike);
+      o.coil = coil;
+      o.aim = ramp(tt, 0, 0.3) * (1 - ramp(tt, 1.0, 1.5));
     } else if (name === "Breath") {
       // Inspire (cou dressé, tête en arrière), puis souffle longtemps en balayant devant lui.
       const inhale = ramp(t, 0, 0.9) * (1 - ramp(t, 0.9, 1.15));
@@ -122,7 +139,7 @@
     // setBone(name, rx, ry, rz, ty, tz, tx) : rotation (X puis Y puis Z, comme CFrame.Angles) + décalage
     // le long des axes de l'os
     const st = { p: Object.assign({}, MODES.Idle), phase: 0, step: 0, flutter: 0, pulse: 0, t: 0,
-      action: null, actionT: 0, breath: 0, cry: 0, burst: false, turn: 0, deadT: 0,
+      action: null, actionT: 0, breath: 0, cry: 0, burst: null, aimYaw: 0, aimPitch: 0, turn: 0, deadT: 0,
       blinkIn: 2, blink: null, headLook: 0, headTarget: 0,
       gazeX: 0, gazeY: 0, gazeTx: 0, gazeTy: 0, gazeIn: 1, microX: 0, microY: 0, microIn: 0.5 };
     function rnd(a, b) { return a + Math.random() * (b - a); }
@@ -140,8 +157,14 @@
     }
 
     // Lance une action ponctuelle (Roar, Bite, Breath). Ignorée si le dragon est mort.
-    function play(name) {
-      if (ACTIONS[name] && st.p.dead < 0.5) { st.action = name; st.actionT = 0; }
+    // aimYaw / aimPitch (rad, facultatifs) : direction de la cible par rapport à l'avant du dragon
+    // (positif = vers la gauche / vers le haut). La morsure part vers elle.
+    function play(name, aimYaw, aimPitch) {
+      if (ACTIONS[name] && st.p.dead < 0.5) {
+        st.action = name; st.actionT = 0;
+        st.aimYaw = Math.max(-0.8, Math.min(0.8, aimYaw || 0));
+        st.aimPitch = Math.max(-0.5, Math.min(0.5, aimPitch || 0));
+      }
     }
 
     // turn : vitesse de virage du dragon (rad/s, positif = vers la gauche, c'est-à-dire vers +X quand il
@@ -166,8 +189,10 @@
       }
       st.breath = act.breath;
       st.cry = act.cry;
-      // Instant du cri (pour l'onde de choc et le tremblement de la caméra) : vrai pendant une seule image.
-      st.burst = st.action === "Roar" && st.actionT >= ROAR_BURST && st.actionT - dt < ROAR_BURST;
+      // Instant fort de l'action (cri, claquement) : nom de l'action pendant une seule image, sinon null.
+      const bt = st.action ? BURSTS[st.action] : undefined;
+      st.burst = bt !== undefined && st.actionT >= bt && st.actionT - dt < bt ? st.action : null;
+      const aimY = st.aimYaw * act.aim, aimP = st.aimPitch * act.aim;
       const d = p.dead;
       // Frisson quand il tombe : une dernière vague rapide qui s'éteint.
       const shiver = 0.1 * Math.sin(st.deadT * 16) * Math.exp(-st.deadT * 2.2) * d;
@@ -183,11 +208,14 @@
         const front = 1 - ramp(sp, 4, 20);                        // 1 pour la tête et le cou, 0 dès le poitrail
         // Couché sur le flanc, l'axe « haut / bas » de la colonne devient horizontal : c'est lui qui recourbe
         // le corps en croissant sur le sol.
-        a[0] += -act.rear * front + 0.022 * d * (14 - sp);       // nul au poitrail : le corps ne bascule pas
+        a[0] += -act.rear * front + 0.022 * d * (14 - sp)        // nul au poitrail : le corps ne bascule pas
+              - 0.5 * aimP * front;                                // le cou se lève / se baisse vers la cible
         a[1] += TURN_CURVE * st.turn * (MID - sp) * (1 - d) + shiver * Math.sin(sp * 0.3)
               + act.lash * ramp(sp, 30, 60) * Math.sin(st.t * 9 - sp * 0.15)
               + act.shiver * Math.sin(st.t * 38 - sp * 0.4)                // frisson du cri, de la tête à la queue
-              + act.yaw * 0.5 * front;                                     // le cou suit la secousse de la tête
+              + act.yaw * 0.5 * front                                      // le cou suit la secousse de la tête
+              + 0.6 * aimY * front                                         // le cou se tourne vers la cible
+              + 0.3 * act.coil * front * Math.sin(sp * 0.45);              // cou replié en S avant de frapper
       });
 
       // 2. Recentrage : position (haut/bas, côté) de chaque articulation par rapport au poitrail.
@@ -247,7 +275,8 @@
       // Tête : suit la vague (en plus calme), suit le regard avec retard et lève ou baisse un peu le nez avec lui.
       // En virage, la tête regarde à l'intérieur ; mort, elle retombe, gueule entrouverte.
       setBone("Head", abs.Head[0] - abs.Neck[0] + (0.04 * Math.sin(st.t * 0.9) - 0.06 * st.gazeY) * (1 - d) + act.pitch
-        + 0.25 * d, abs.Head[1] - abs.Neck[1] + st.headLook * (1 - d) + act.yaw + 0.45 * st.turn * (1 - d), 0, 0, 0);
+        + 0.25 * d - 0.5 * aimP, abs.Head[1] - abs.Neck[1] + st.headLook * (1 - d) + act.yaw + 0.45 * st.turn * (1 - d)
+        + 0.4 * aimY, 0, 0, 0);
       setBone("Jaw", Math.max(p.jaw * (0.6 + 0.4 * Math.sin(st.t * 1.3)), act.jaw) + 0.2 * d, 0, 0, 0, 0);
 
       // Clignement : fermeture très rapide, courte pause, réouverture plus lente avec un léger rebond.
@@ -318,5 +347,5 @@
     }
     return { update: update, play: play, state: st, pulseAt: pulseAt };
   }
-  global.DragonAnimator = { create: create, MODES: MODES, ACTIONS: ACTIONS, BLINK_UP: BLINK_UP, BLINK_LOW: BLINK_LOW };
+  global.DragonAnimator = { create: create, MODES: MODES, ACTIONS: ACTIONS, BURSTS: BURSTS, BLINK_UP: BLINK_UP, BLINK_LOW: BLINK_LOW };
 })(window);

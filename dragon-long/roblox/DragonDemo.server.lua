@@ -11,6 +11,7 @@ DragonAnimator chez chaque joueur.
 ]]
 
 local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
 
 local DRAGON_NAME = "Dragon_Long_Test"
 local WALK_SPEED = 8      -- studs/s
@@ -31,6 +32,20 @@ local actionCount = 0
 local function playAction(name)
 	actionCount += 1
 	dragon:SetAttribute("Action", name .. "#" .. actionCount)
+end
+
+-- Cible de la morsure : le joueur le plus proche (à moins de 40 studs), sinon un point devant, un peu à gauche.
+local function aimAtNearestPlayer()
+	local best, bestDist = nil, 40
+	local pos = dragon:GetPivot().Position
+	for _, plr in ipairs(Players:GetPlayers()) do
+		local root = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+		if root and (root.Position - pos).Magnitude < bestDist then
+			best, bestDist = root.Position, (root.Position - pos).Magnitude
+		end
+	end
+	-- La tête regarde vers +Z du modèle (HEAD_FORWARD) : point à 30 studs devant, 8 à gauche, 12 de haut.
+	dragon:SetAttribute("Target", best or (dragon:GetPivot() * CFrame.new(8, 12, 30 * HEAD_FORWARD)).Position)
 end
 
 local function run(duration, stepFn)
@@ -55,6 +70,7 @@ while true do
 		dragon:PivotTo(dragon:GetPivot() * CFrame.new(0, 0, HEAD_FORWARD * WALK_SPEED * dt))
 	end)
 	setMode("Idle")
+	aimAtNearestPlayer()
 	playAction("Bite")
 	task.wait(1.5)
 
