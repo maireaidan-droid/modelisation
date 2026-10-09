@@ -27,9 +27,11 @@ local BLINK = 0.45      -- la paupière descend un peu (rad)…
 local SINK = 0.75       -- …et l'œil s'enfonce dans l'orbite (studs) : l'œil paraît fermé
 
 local MODES = {
-	Idle = { side = 0.035, pitch = 0.015, wave = 1.2, tuck = 0, walk = 0, mane = 0.12, maneSpeed = 1.6, jaw = 0.04, bob = 0.15 },
-	Walk = { side = 0.07, pitch = 0.012, wave = 3.4, tuck = 0, walk = 1, mane = 0.2, maneSpeed = 3.2, jaw = 0.07, bob = 0.2 },
-	Fly  = { side = 0.11, pitch = 0.05, wave = 2.2, tuck = 1, walk = 0, mane = 0.38, maneSpeed = 5.5, jaw = 0.12, bob = 0.9 },
+	Idle = { side = 0.035, pitch = 0.015, wave = 1.2, tuck = 0, walk = 0, mane = 0.12, maneSpeed = 1.6, jaw = 0.04, bob = 0.15, bank = 0, dive = 0 },
+	Walk = { side = 0.07, pitch = 0.012, wave = 3.4, tuck = 0, walk = 1, mane = 0.2, maneSpeed = 3.2, jaw = 0.07, bob = 0.2, bank = 0, dive = 0 },
+	-- Vol : grandes vagues verticales qui descendent du cou vers la queue (le dragon « nage » dans l'air),
+	-- un peu de roulis et de tangage de tout le corps, crinière soulevée qui claque au vent.
+	Fly  = { side = 0.06, pitch = 0.17, wave = 2.6, tuck = 1, walk = 0, mane = 0.5, maneSpeed = 7, jaw = 0.14, bob = 1.4, bank = 0.12, dive = 0.08 },
 }
 
 local TAIL = {}
@@ -94,13 +96,16 @@ local function update(st, dt)
 	-- Colonne : une onde qui part du cou et grandit vers la queue.
 	for i, name in ipairs(TAIL) do
 		local grow = 0.6 + 0.6 * i / 14
-		local yaw = p.side * grow * math.sin(st.phase - i * 0.55)
-		local pitch = p.pitch * grow * math.sin(st.phase * 0.8 - i * 0.45)
+		local yaw = p.side * grow * math.sin(st.phase * 0.7 - i * 0.4 + 1)
+		local pitch = p.pitch * grow * math.sin(st.phase - i * 0.45)
 		setBone(st, name, pitch, yaw, 0)
 	end
-	local neckYaw = p.side * 0.7 * math.sin(st.phase + 0.55)
-	setBone(st, "Neck", p.pitch * 0.6 * math.sin(st.phase * 0.8 + 0.45), neckYaw, 0)
-	setBone(st, "Root", 0, 0, 0, p.bob * math.sin(st.t * 1.1) + 0.12 * p.walk * math.abs(math.sin(st.step)))
+	local neckYaw = p.side * 0.7 * math.sin(st.phase * 0.7 + 1.4)
+	local neckPitch = p.pitch * 0.9 * math.sin(st.phase + 0.45)
+	setBone(st, "Neck", neckPitch, neckYaw, 0)
+	-- Tout le corps : monte et descend, pique légèrement et s'incline (roulis) en vol.
+	setBone(st, "Root", p.dive * math.sin(st.phase * 0.5), 0, p.bank * math.sin(st.phase * 0.35),
+		p.bob * math.sin(st.phase * 0.5 + 1) + 0.12 * p.walk * math.abs(math.sin(st.step)))
 
 	-- Tête : compense l'ondulation pour garder le regard stable, et regarde autour d'elle au repos.
 	st.lookIn -= dt
@@ -111,7 +116,8 @@ local function update(st, dt)
 	end
 	st.look += (st.lookTarget - st.look) * math.min(1, dt * 6)
 	st.headLook += (st.headTarget - st.headLook) * math.min(1, dt * 1.5)
-	setBone(st, "Head", 0.05 * math.sin(st.t * 0.9), -neckYaw * 0.8 + st.headLook, 0)
+	-- La tête garde le cap : elle compense une bonne partie de l'ondulation du cou.
+	setBone(st, "Head", 0.05 * math.sin(st.t * 0.9) - neckPitch * 0.7, -neckYaw * 0.8 + st.headLook, 0)
 	setBone(st, "Jaw", p.jaw * (0.6 + 0.4 * math.sin(st.t * 1.3)), 0, 0)
 
 	-- Clignement : fermeture rapide, réouverture un peu plus lente.
@@ -139,9 +145,10 @@ local function update(st, dt)
 
 	-- Crinière, moustaches, barbichette : flottent, plus fort en vol.
 	local f, m = st.flutter, p.mane
-	setBone(st, "Mane_Top", 0.5 * m * math.sin(f), m * math.sin(f * 1.3 + 1), 0)
-	setBone(st, "Mane_L", 0.6 * m * math.sin(f + 2), m * math.sin(f * 1.1 + 0.5), 0)
-	setBone(st, "Mane_R", 0.6 * m * math.sin(f + 2.6), -m * math.sin(f * 1.1 + 1.2), 0)
+	local lift = 0.25 * p.tuck -- en vol, la crinière se soulève et part vers l'arrière
+	setBone(st, "Mane_Top", lift + 0.5 * m * math.sin(f), m * math.sin(f * 1.3 + 1), 0)
+	setBone(st, "Mane_L", lift + 0.6 * m * math.sin(f + 2), m * math.sin(f * 1.1 + 0.5), 0)
+	setBone(st, "Mane_R", lift + 0.6 * m * math.sin(f + 2.6), -m * math.sin(f * 1.1 + 1.2), 0)
 	setBone(st, "Whisker_L", 0.8 * m * math.sin(f * 0.9), m * math.sin(f * 0.7 + 0.3), 0)
 	setBone(st, "Whisker_R", 0.8 * m * math.sin(f * 0.9 + 1), -m * math.sin(f * 0.7 + 1.1), 0)
 	setBone(st, "Beard", 0.5 * m * math.sin(f * 0.8), 0.4 * m * math.sin(f * 1.2), 0)
@@ -150,7 +157,8 @@ local function update(st, dt)
 	for leg, offset in pairs(LEGS) do
 		local ph = st.step + offset
 		local sw, lift = math.sin(ph), math.max(0, math.cos(ph))
-		setBone(st, leg .. "_Upper", -0.45 * sw * p.walk + 0.9 * p.tuck, 0, 0)
+		local paddle = 0.15 * p.tuck * math.sin(st.phase * 1.5 + offset) -- pattes qui pagaient en vol
+		setBone(st, leg .. "_Upper", -0.45 * sw * p.walk + 0.9 * p.tuck + paddle, 0, 0)
 		setBone(st, leg .. "_Fore", 0.6 * lift * p.walk + 0.6 * p.tuck, 0, 0)
 		setBone(st, leg .. "_Foot", -0.35 * lift * p.walk - 0.4 * p.tuck, 0, 0)
 	end
