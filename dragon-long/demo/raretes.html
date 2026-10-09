@@ -3,7 +3,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap">
 <style>
 /* Plein écran : la scène 3D au fond, le nom de la rareté en haut à gauche, les 4 cartes de rareté en bas.
-   Un seul univers sombre (vitrine nocturne) ; la couleur d'accent change avec la rareté choisie. */
+   Un seul univers sombre (vitrine nocturne) ; la couleur d'accent change avec la rareté choisie. 5 raretés. */
 :root {
   color-scheme: dark;
   --bg: #100d10;
@@ -87,9 +87,9 @@ body {
   right: 16px;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
-  max-width: 980px;
+  max-width: 1200px;
   margin-inline: auto;
 }
 .card {
@@ -112,6 +112,16 @@ body {
 }
 .card:hover { transform: translateY(-2px); }
 .card[aria-pressed="true"] { border-color: var(--c); box-shadow: 0 0 0 1px var(--c), 0 8px 28px -10px var(--c); }
+/* Mythique : bordure arc-en-ciel qui défile */
+.card.mythic {
+  border: 1px solid transparent;
+  border-top: 3px solid transparent;
+  background: linear-gradient(var(--panel), var(--panel)) padding-box,
+              linear-gradient(90deg, #ff4fd8, #8a5cff, #3be0ff, #ffd36b, #ff4fd8) border-box;
+  background-size: 100% 100%, 300% 100%;
+  animation: iris 6s linear infinite;
+}
+@keyframes iris { to { background-position: 0 0, 300% 0; } }
 .card .rar { font: 800 11px/1 var(--body); letter-spacing: 0.14em; text-transform: uppercase; color: var(--c); }
 .card .name { font: 700 17px/1.15 var(--display); letter-spacing: 0.04em; }
 .swatches { display: flex; gap: 4px; }
@@ -132,12 +142,15 @@ body {
 }
 #status[hidden] { display: none; }
 
+@media (max-width: 1000px) {
+  .card ul { display: none; }
+}
 @media (max-width: 760px) {
-  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .card ul { display: none; }
   .title p { display: none; }
 }
-@media (prefers-reduced-motion: reduce) { body, .card { transition: none; } }
+@media (prefers-reduced-motion: reduce) { body, .card { transition: none; } .card.mythic { animation: none; } }
 </style>
 
 <div id="stage"></div>
@@ -190,7 +203,14 @@ body {
       points: ["Forme unique : grands bois", "Palette nacre et or lumineuse", "Aura de particules"],
       parts: { Body: "#E3D8C4", Belly: "#D9A93F", Fins: "#FFD24D", Horns: "#E8B84F", Whiskers: "#FFF0A8",
                Eyes: "#7FF7FF", Pupils: "#1B1406", Mouth: "#8E2529", Tongue: "#C25A5A" },
-      glow: { Fins: 0.8, Whiskers: 0.45, Horns: 0.15 }, sparkles: true }
+      glow: { Fins: 0.8, Whiskers: 0.45, Horns: 0.15 }, sparkles: "rise" },
+    { id: "mythique", rarity: "Mythique", color: "#ff4fd8", name: "Dragon du Néant", file: "dragon_v19_neant_rig.txt",
+      desc: "Né de la nuit entre les étoiles : cornes torsadées, crinière aux couleurs changeantes, poussière d'étoiles " +
+            "et la perle sacrée qu'il garde devant sa gueule.",
+      points: ["Forme unique : cornes en spirale", "Couleurs irisées qui changent", "Perle sacrée et poussière d'étoiles"],
+      parts: { Body: "#1C1638", Belly: "#6A4BD8", Fins: "#FF4FD8", Horns: "#EDE6FF", Whiskers: "#8FF3FF",
+               Eyes: "#FFFFFF", Pupils: "#2A0A3A", Mouth: "#5A1650", Tongue: "#C04A9A" },
+      glow: { Fins: 0.9, Whiskers: 0.6, Horns: 0.25, Belly: 0.12 }, sparkles: "swirl", iris: true, pearl: true }
   ];
 
   const stage = document.getElementById("stage");
@@ -323,7 +343,11 @@ body {
   for (let k = 1; k <= 14; k++) SPINE_NAMES.push("S" + String(k).padStart(2, "0"));
   const tmp = new THREE.Vector3();
 
+  const sparkBone = new Int16Array(SPARKS), sparkAng = new Float32Array(SPARKS), sparkRad = new Float32Array(SPARKS);
+  let sparkMode = "rise";
+
   function updateSparks(dt, entry) {
+    if (sparkMode === "swirl") return updateSwirl(dt, entry);
     for (let i = 0; i < SPARKS; i++) {
       sparkLife[i] -= dt;
       if (sparkLife[i] <= 0) {
@@ -347,11 +371,69 @@ body {
     sparkGeo.attributes.alpha.needsUpdate = true;
   }
 
+  // Poussière d'étoiles : chaque grain tourne autour du corps en spirale, puis s'éteint.
+  function updateSwirl(dt, entry) {
+    for (let i = 0; i < SPARKS; i++) {
+      sparkLife[i] -= dt;
+      if (sparkLife[i] <= 0) {
+        sparkBone[i] = (Math.random() * SPINE_NAMES.length) | 0;
+        sparkAng[i] = Math.random() * Math.PI * 2;
+        sparkRad[i] = 2.6 + Math.random() * 2.6;
+        sparkVel[i * 3] = (Math.random() < 0.5 ? -1 : 1) * (1.2 + Math.random() * 1.4);
+        sparkLife[i] = 1.6 + Math.random() * 2.2;
+      }
+      sparkAng[i] += sparkVel[i * 3] * dt;
+      entry.bones[SPINE_NAMES[sparkBone[i]]].getWorldPosition(tmp);
+      const r = sparkRad[i] * (0.8 + 0.25 * sparkLife[i] / 3.8);
+      sparkPos[i * 3] = tmp.x + Math.cos(sparkAng[i]) * r;
+      sparkPos[i * 3 + 1] = tmp.y + Math.sin(sparkAng[i]) * r;
+      sparkPos[i * 3 + 2] = tmp.z + Math.sin(sparkAng[i] * 0.5 + i) * 1.5;
+      const life = sparkLife[i];
+      sparkAlpha[i] = Math.min(1, life * 1.5) * Math.min(1, (3.8 - life) * 2) * (0.5 + 0.5 * Math.sin(life * 14 + i));
+    }
+    sparkGeo.attributes.position.needsUpdate = true;
+    sparkGeo.attributes.alpha.needsUpdate = true;
+  }
+
+  // ---------- Perle sacrée (Mythique) : flotte et tourne devant la gueule ----------
+  const pearl = new THREE.Group();
+  const pearlBall = new THREE.Mesh(new THREE.IcosahedronGeometry(0.9, 1),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: new THREE.Color(0xffd9f6), emissiveIntensity: 1.4,
+      roughness: 0.3, flatShading: true }));
+  const pearlHalo = new THREE.Mesh(new THREE.RingGeometry(1.25, 1.45, 32),
+    new THREE.MeshBasicMaterial({ color: 0xff8fe6, transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
+  const pearlLight = new THREE.PointLight(0xff9fe9, 1.6, 18);
+  pearl.add(pearlBall, pearlHalo, pearlLight);
+  pearl.visible = false;
+  scene.add(pearl);
+  const headPos = new THREE.Vector3(), headQuat = new THREE.Quaternion(), headFwd = new THREE.Vector3();
+
+  function updatePearl(t, entry) {
+    const h = entry.bones.Head;
+    h.getWorldPosition(headPos);
+    h.getWorldQuaternion(headQuat);
+    headFwd.set(0, 0, 1).applyQuaternion(headQuat);
+    pearl.position.copy(headPos).addScaledVector(headFwd, 8.5);
+    pearl.position.x += Math.cos(t * 1.3) * 1.2;
+    pearl.position.y += 0.8 + Math.sin(t * 1.7) * 0.7;
+    pearlBall.rotation.y = t * 1.5;
+    pearlHalo.lookAt(camera.position);
+    pearlHalo.scale.setScalar(1 + 0.08 * Math.sin(t * 3));
+  }
+
+  // ---------- Couleurs irisées (Mythique) : crête et crinière passent du magenta au violet puis au cyan ----------
+  const IRIS = ["#FF4FD8", "#8A5CFF", "#3BE0FF"].map(function (c) { return new THREE.Color(c).convertSRGBToLinear(); });
+  const irisCol = new THREE.Color();
+  function irisAt(x) {
+    const n = IRIS.length, k = ((x % n) + n) % n, i = Math.floor(k);
+    return irisCol.copy(IRIS[i]).lerp(IRIS[(i + 1) % n], k - i);
+  }
+
   // ---------- Interface ----------
   const cards = document.getElementById("cards");
   RARITIES.forEach(function (r) {
     const b = document.createElement("button");
-    b.className = "card";
+    b.className = "card" + (r.id === "mythique" ? " mythic" : "");
     b.id = "card-" + r.id;
     b.style.setProperty("--c", r.color);
     b.setAttribute("aria-pressed", "false");
@@ -383,6 +465,9 @@ body {
       current = r;
       currentEntry = entry;
       sparks.visible = !!r.sparkles;
+      if (r.sparkles && r.sparkles !== sparkMode) { sparkMode = r.sparkles; sparkLife.fill(0); }
+      sparkMat.uniforms.uColor.value.set(r.sparkles === "swirl" ? 0xd7c9ff : 0xffd36b);
+      pearl.visible = !!r.pearl;
       status.hidden = true;
     }).catch(function () {
       status.hidden = false;
@@ -399,7 +484,11 @@ body {
 
   select(RARITIES[0]);
   // On précharge les formes spéciales en arrière-plan pour que le changement soit instantané.
-  setTimeout(function () { loadModel("dragon_v19_glace_rig.txt"); loadModel("dragon_v19_celeste_rig.txt"); }, 1500);
+  setTimeout(function () {
+    loadModel("dragon_v19_glace_rig.txt");
+    loadModel("dragon_v19_celeste_rig.txt");
+    loadModel("dragon_v19_neant_rig.txt");
+  }, 1500);
 
   // ---------- Boucle ----------
   const clock = new THREE.Clock();
@@ -420,9 +509,13 @@ body {
         controls.target.lerp(followVec.copy(pivot.position).add(followOffset), Math.min(1, dt * 2.5));
         camera.position.add(followPrev.subVectors(controls.target, followPrev));
       }
-      if (sparks.visible && !reduceMotion) {
-        scene.updateMatrixWorld();
-        updateSparks(dt, currentEntry);
+      if ((sparks.visible || pearl.visible) && !reduceMotion) scene.updateMatrixWorld();
+      if (sparks.visible && !reduceMotion) updateSparks(dt, currentEntry);
+      if (pearl.visible) updatePearl(clock.elapsedTime, currentEntry);
+      if (current && current.iris && !reduceMotion) {
+        const t = clock.elapsedTime * 0.25;
+        (currentEntry.meshes.Fins || []).forEach(function (o) { o.material.color.copy(irisAt(t)); o.material.emissive.copy(irisCol); });
+        (currentEntry.meshes.Whiskers || []).forEach(function (o) { o.material.color.copy(irisAt(t + 1.2)); o.material.emissive.copy(irisCol); });
       }
     }
     controls.update();

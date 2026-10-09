@@ -61,8 +61,9 @@ Pour les nageoires, mettre `DoubleSided = true` si elles disparaissent sous cert
 | Rare | Dragon de Braise | palette feu, crinière et crête lumineuses | même modèle |
 | Épique | Dragon de Glace | crête et queue en cristaux, cornes en couronne, palette glacée | `objets/Dragon_Long_v19_glace_rig.glb` |
 | Légendaire | Dragon Céleste | grands bois à 3 branches, cristaux, palette nacre et or lumineuse, aura d'étincelles | `objets/Dragon_Long_v19_celeste_rig.glb` |
+| Mythique | Dragon du Néant | cornes en spirale torsadée, cristaux, palette nuit cosmique, crinière et crête irisées (magenta → violet → cyan), perle sacrée qui flotte devant la gueule, poussière d'étoiles en spirale | `objets/Dragon_Long_v19_neant_rig.glb` |
 
-Les formes spéciales viennent du même générateur (`python build_rig.py glace` / `celeste`) avec le même squelette :
+Les formes spéciales viennent du même générateur (`python build_rig.py glace` / `celeste` / `neant`) avec le même squelette :
 toutes les animations marchent pour toutes les raretés. Les palettes sont dans `demo/raretes.html`.
 
 ## Animation

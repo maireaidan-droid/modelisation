@@ -995,6 +995,19 @@ def build_head(a, neck, neck_r):
                 d = normalize(u * up_k - f * 0.6 + s * side * out_k)
                 ridged([b0, b0 + d * L * 0.5 * S, b0 + d * L * S + u * 0.15 * S], r, 10, ring=2.0)
             continue
+        if horns == "spirale":
+            # Cornes torsadées en spirale (comme un koudou), qui montent vers l'arrière en s'enroulant.
+            base = P(-0.2, 1.45, 0.75 * side)
+            d = normalize(u * 0.95 - f * 0.75 + s * side * 0.3)
+            p1 = normalize(np.cross(d, u))
+            p2 = np.cross(d, p1)
+            L, R = 4.2 * S, 0.42 * S
+            pts = []
+            for t in np.linspace(0, 1, 28):
+                th = side * 2 * np.pi * 2.3 * t
+                pts.append(base + d * L * t + (p1 * np.cos(th) + p2 * np.sin(th)) * R * (0.25 + 0.75 * t) * (1 - 0.35 * t))
+            ridged(pts, 0.42, 34, ring=2.6)
+            continue
         k = 1.3 if horns == "grands_bois" else 1.0
         base = P(-0.1, 1.45, 0.7 * side)
         path = [P(-0.1, 1.45, 0.7 * side), P(-0.9, 2.45, 0.95 * side), P(-2.0, 3.25, 1.25 * side),
@@ -1059,6 +1072,7 @@ VARIANTS = {
     "": {},                                                   # forme de base : bois de cerf, crête en flammes
     "glace": {"horns": "couronne", "crest": "cristaux"},      # Épique
     "celeste": {"horns": "grands_bois", "crest": "cristaux"},  # Légendaire
+    "neant": {"horns": "spirale", "crest": "cristaux"},       # Mythique
 }
 
 
