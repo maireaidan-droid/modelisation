@@ -27,17 +27,20 @@ local BLINK = 0.45      -- la paupière descend un peu (rad)…
 local SINK = 0.75       -- …et l'œil s'enfonce dans l'orbite (studs) : l'œil paraît fermé
 
 local MODES = {
-	Idle = { side = 0.035, pitch = 0.015, wave = 1.2, tuck = 0, walk = 0, mane = 0.12, maneSpeed = 1.6, jaw = 0.04, bob = 0.15, bank = 0, dive = 0 },
-	Walk = { side = 0.07, pitch = 0.012, wave = 3.4, tuck = 0, walk = 1, mane = 0.2, maneSpeed = 3.2, jaw = 0.07, bob = 0.2, bank = 0, dive = 0 },
+	Idle = { side = 0.035, pitch = 0.015, wave = 1.2, tuck = 0, walk = 0, mane = 0.12, maneSpeed = 1.6, jaw = 0.04, bob = 0.15, bank = 0, dive = 0, neck = 0.75, sway = 0, swayPh = 0, tail = 1 },
+	Walk = { side = 0.07, pitch = 0.012, wave = 3.4, tuck = 0, walk = 1, mane = 0.2, maneSpeed = 3.2, jaw = 0.07, bob = 0.2, bank = 0, dive = 0, neck = 0.75, sway = 0, swayPh = 0, tail = 1 },
 	-- Vol : grandes vagues verticales qui descendent du cou vers la queue (le dragon « nage » dans l'air),
 	-- un peu de roulis et de tangage de tout le corps, crinière soulevée qui claque au vent.
-	Fly  = { side = 0.06, pitch = 0.17, wave = 2.6, tuck = 1, walk = 0, mane = 0.5, maneSpeed = 7, jaw = 0.14, bob = 1.4, bank = 0.12, dive = 0.08 },
+	-- neck : force de l'onde dans le cou ; sway : bascule du poitrail (fait bouger tout l'avant) ; tail : force dans la queue.
+	Fly  = { side = 0.05, pitch = 0.1, wave = 2.6, tuck = 1, walk = 0, mane = 0.5, maneSpeed = 7, jaw = 0.14, bob = 1.4, bank = 0.12, dive = 0.05,
+		neck = 1.0, sway = 0.18, swayPh = 2.0, tail = 0.5 },
 }
 
 local TAIL = {}
 for k = 1, 14 do
 	TAIL[k] = string.format("S%02d", k)
 end
+local NECK = { { "Neck2", -1 }, { "Neck", -2 } }
 local LEGS = { LegFL = 0, LegBR = 0, LegFR = math.pi, LegBL = math.pi }
 
 local rng = Random.new()
@@ -95,16 +98,24 @@ local function update(st, dt)
 
 	-- Colonne : une onde qui part du cou et grandit vers la queue.
 	for i, name in ipairs(TAIL) do
-		local grow = 0.6 + 0.6 * i / 14
+		local grow = 0.6 + 0.4 * i / 14
 		local yaw = p.side * grow * math.sin(st.phase * 0.7 - i * 0.4 + 1)
-		local pitch = p.pitch * grow * math.sin(st.phase - i * 0.45)
+		local pitch = p.pitch * p.tail * grow * math.sin(st.phase - i * 0.45)
 		setBone(st, name, pitch, yaw, 0)
 	end
-	local neckYaw = p.side * 0.7 * math.sin(st.phase * 0.7 + 1.4)
-	local neckPitch = p.pitch * 0.9 * math.sin(st.phase + 0.45)
-	setBone(st, "Neck", neckPitch, neckYaw, 0)
+	-- Cou : la même onde continue jusqu'à la tête (signe inversé : ces os pointent vers l'avant).
+	local neckPitch, neckYaw = 0, 0
+	for _, n in ipairs(NECK) do
+		local k1 = n[2]
+		local yaw = -p.side * p.neck * math.sin(st.phase * 0.7 - k1 * 0.4 + 1)
+		local pitch = -p.pitch * p.neck * math.sin(st.phase - k1 * 0.45)
+		setBone(st, n[1], pitch, yaw, 0)
+		neckPitch += pitch
+		neckYaw += yaw
+	end
 	-- Tout le corps : monte et descend, pique légèrement et s'incline (roulis) en vol.
-	setBone(st, "Root", p.dive * math.sin(st.phase * 0.5), 0, p.bank * math.sin(st.phase * 0.35),
+	-- sway : le poitrail bascule au rythme de la vague, ce qui fait monter et descendre tout l'avant.
+	setBone(st, "Root", p.dive * math.sin(st.phase * 0.5) + p.sway * math.sin(st.phase + p.swayPh), 0, p.bank * math.sin(st.phase * 0.35),
 		p.bob * math.sin(st.phase * 0.5 + 1) + 0.12 * p.walk * math.abs(math.sin(st.step)))
 
 	-- Tête : compense l'ondulation pour garder le regard stable, et regarde autour d'elle au repos.
@@ -116,8 +127,8 @@ local function update(st, dt)
 	end
 	st.look += (st.lookTarget - st.look) * math.min(1, dt * 6)
 	st.headLook += (st.headTarget - st.headLook) * math.min(1, dt * 1.5)
-	-- La tête garde le cap : elle compense une bonne partie de l'ondulation du cou.
-	setBone(st, "Head", 0.05 * math.sin(st.t * 0.9) - neckPitch * 0.7, -neckYaw * 0.8 + st.headLook, 0)
+	-- La tête suit la vague et n'en compense qu'une partie : elle mène le mouvement.
+	setBone(st, "Head", 0.05 * math.sin(st.t * 0.9) - neckPitch * 0.2, -neckYaw * 0.4 + st.headLook, 0)
 	setBone(st, "Jaw", p.jaw * (0.6 + 0.4 * math.sin(st.t * 1.3)), 0, 0)
 
 	-- Clignement : fermeture rapide, réouverture un peu plus lente.

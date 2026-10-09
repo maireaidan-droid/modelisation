@@ -946,7 +946,7 @@ def build_head(a, neck, neck_r):
     a.gid = 0
 
 
-SPINE_BONES = [(0, "Head"), (7, "Neck"), (14, "Root")] + [(18 + 4 * k, "S%02d" % (k + 1)) for k in range(14)]
+SPINE_BONES = [(0, "Head"), (5, "Neck"), (10, "Neck2"), (14, "Root")] + [(18 + 4 * k, "S%02d" % (k + 1)) for k in range(14)]
 
 
 def build():
@@ -958,11 +958,12 @@ def build():
     t = np.linspace(0, 1, RINGS)
     radii = np.array([body_radius(x) for x in t])
     a.spine_pts = pts
-    # Colonne : Root au poitrail, Neck vers la tête, S01…S14 jusqu'au bout de la queue.
+    # Colonne : Root au poitrail, Neck2 puis Neck vers la tête, S01…S14 jusqu'au bout de la queue.
     a.bone("Root", pts[14])
-    a.bone("Neck", pts[7], "Root")
+    a.bone("Neck2", pts[10], "Root")
+    a.bone("Neck", pts[5], "Neck2")
     prev = "Root"
-    for i, nm in SPINE_BONES[3:]:
+    for i, nm in SPINE_BONES[4:]:
         a.bone(nm, pts[i], prev)
         prev = nm
     build_body(a, pts, T, N, B, radii)

@@ -4,14 +4,16 @@
   const BLINK = 0.45;              // la paupière descend un peu (rad)…
   const SINK = 0.75;               // …et l'œil s'enfonce dans l'orbite (studs) : l'œil paraît fermé
   const MODES = {
-    Idle: { side: 0.035, pitch: 0.015, wave: 1.2, tuck: 0, walk: 0, mane: 0.12, maneSpeed: 1.6, jaw: 0.04, bob: 0.15, bank: 0, dive: 0 },
-    Walk: { side: 0.07, pitch: 0.012, wave: 3.4, tuck: 0, walk: 1, mane: 0.2, maneSpeed: 3.2, jaw: 0.07, bob: 0.2, bank: 0, dive: 0 },
+    Idle: { side: 0.035, pitch: 0.015, wave: 1.2, tuck: 0, walk: 0, mane: 0.12, maneSpeed: 1.6, jaw: 0.04, bob: 0.15, bank: 0, dive: 0, neck: 0.75, sway: 0, swayPh: 0, tail: 1 },
+    Walk: { side: 0.07, pitch: 0.012, wave: 3.4, tuck: 0, walk: 1, mane: 0.2, maneSpeed: 3.2, jaw: 0.07, bob: 0.2, bank: 0, dive: 0, neck: 0.75, sway: 0, swayPh: 0, tail: 1 },
     // Vol : grandes vagues verticales qui descendent du cou vers la queue (le dragon « nage » dans l'air),
     // un peu de roulis et de tangage de tout le corps, crinière soulevée qui claque au vent.
-    Fly:  { side: 0.06, pitch: 0.17, wave: 2.6, tuck: 1, walk: 0, mane: 0.5, maneSpeed: 7, jaw: 0.14, bob: 1.4, bank: 0.12, dive: 0.08 }
+    Fly:  { side: 0.05, pitch: 0.1, wave: 2.6, tuck: 1, walk: 0, mane: 0.5, maneSpeed: 7, jaw: 0.14, bob: 1.4, bank: 0.12, dive: 0.05,
+            neck: 1.0, sway: 0.18, swayPh: 2.0, tail: 0.5 }
   };
   const TAIL = [];
   for (let k = 1; k <= 14; k++) TAIL.push("S" + String(k).padStart(2, "0"));
+  const NECK = [["Neck2", -1], ["Neck", -2]];
   const LEGS = { LegFL: 0, LegBR: 0, LegFR: Math.PI, LegBL: Math.PI };
 
   function create(bones, setBone) {
@@ -32,16 +34,24 @@
 
       // Colonne : une onde qui part du cou et grandit vers la queue.
       TAIL.forEach(function (name, i) {
-        const k1 = i + 1, grow = 0.6 + 0.6 * k1 / 14;
+        const k1 = i + 1, grow = 0.6 + 0.4 * k1 / 14;
         const yaw = p.side * grow * Math.sin(st.phase * 0.7 - k1 * 0.4 + 1);
-        const pitch = p.pitch * grow * Math.sin(st.phase - k1 * 0.45);
+        const pitch = p.pitch * p.tail * grow * Math.sin(st.phase - k1 * 0.45);
         setBone(name, pitch, yaw, 0, 0);
       });
-      const neckYaw = p.side * 0.7 * Math.sin(st.phase * 0.7 + 1.4);
-      const neckPitch = p.pitch * 0.9 * Math.sin(st.phase + 0.45);
-      setBone("Neck", neckPitch, neckYaw, 0, 0);
+      // Cou : la même onde continue jusqu'à la tête (signe inversé : ces os pointent vers l'avant).
+      let neckPitch = 0, neckYaw = 0;
+      NECK.forEach(function (n) {
+        const k1 = n[1];
+        const yaw = -p.side * p.neck * Math.sin(st.phase * 0.7 - k1 * 0.4 + 1);
+        const pitch = -p.pitch * p.neck * Math.sin(st.phase - k1 * 0.45);
+        setBone(n[0], pitch, yaw, 0, 0);
+        neckPitch += pitch;
+        neckYaw += yaw;
+      });
       // Tout le corps : monte et descend, pique légèrement et s'incline (roulis) en vol.
-      setBone("Root", p.dive * Math.sin(st.phase * 0.5), 0, p.bank * Math.sin(st.phase * 0.35), 
+      // sway : le poitrail bascule au rythme de la vague, ce qui fait monter et descendre tout l'avant.
+      setBone("Root", p.dive * Math.sin(st.phase * 0.5) + p.sway * Math.sin(st.phase + p.swayPh), 0, p.bank * Math.sin(st.phase * 0.35), 
         p.bob * Math.sin(st.phase * 0.5 + 1) + 0.12 * p.walk * Math.abs(Math.sin(st.step)));
 
       // Tête : compense l'ondulation pour garder le regard stable, et regarde autour en Idle.
@@ -53,8 +63,8 @@
       }
       st.look += (st.lookTarget - st.look) * Math.min(1, dt * 6);
       st.headLook += (st.headTarget - st.headLook) * Math.min(1, dt * 1.5);
-      // La tête garde le cap : elle compense une bonne partie de l'ondulation du cou.
-      setBone("Head", 0.05 * Math.sin(st.t * 0.9) - neckPitch * 0.7, -neckYaw * 0.8 + st.headLook, 0, 0);
+      // La tête suit la vague et n'en compense qu'une partie : elle mène le mouvement.
+      setBone("Head", 0.05 * Math.sin(st.t * 0.9) - neckPitch * 0.2, -neckYaw * 0.4 + st.headLook, 0, 0);
       setBone("Jaw", p.jaw * (0.6 + 0.4 * Math.sin(st.t * 1.3)), 0, 0, 0);
 
       // Clignement : fermeture rapide, réouverture un peu plus lente.

@@ -3,6 +3,7 @@
   "tris": 28662,
   "bones": [
     "Root",
+    "Neck2",
     "Neck",
     "S01",
     "S02",
@@ -45,7 +46,8 @@
   ],
   "parents": {
     "Root": null,
-    "Neck": "Root",
+    "Neck2": "Root",
+    "Neck": "Neck2",
     "S01": "Root",
     "S02": "S01",
     "S03": "S02",
