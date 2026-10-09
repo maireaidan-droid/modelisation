@@ -206,12 +206,12 @@ body {
       glow: { Fins: 0.8, Whiskers: 0.45, Horns: 0.15 }, sparkles: "rise" },
     { id: "mythique", rarity: "Mythique", color: "#ff4fd8", name: "Dragon du Néant", file: "dragon_v19_neant_rig.txt",
       desc: "Né de la nuit entre les étoiles : son corps noir laisse passer une vague de lumière des cornes à la " +
-            "queue, ses cristaux flottent autour de lui et ses yeux brillent. Il garde la perle sacrée devant sa gueule.",
+            "queue, ses cristaux flottent autour de lui et ses yeux brillent.",
       points: ["Pulsation : vague de lumière tête → queue", "Cristaux flottants, yeux qui brillent",
-               "Cornes en spirale, couleurs irisées", "Perle sacrée et poussière d'étoiles"],
+               "Cornes en spirale, couleurs irisées", "Poussière d'étoiles en spirale"],
       parts: { Body: "#0C0918", Belly: "#2B1F5C", Fins: "#FF4FD8", Horns: "#CFC6E8", Whiskers: "#8FF3FF",
                Eyes: "#FF3FD8", Pupils: "#12021C", Mouth: "#3A0C34", Tongue: "#A03A82" },
-      glow: { Fins: 0.5, Whiskers: 0.45, Horns: 0.08, Belly: 0.04 }, sparkles: "swirl", iris: true, pearl: true,
+      glow: { Fins: 0.5, Whiskers: 0.45, Horns: 0.08, Belly: 0.04 }, sparkles: "swirl", iris: true,
       pulse: true, eyeGlow: 0xff3fd8 }
   ];
 
@@ -416,32 +416,6 @@ body {
     sparkGeo.attributes.alpha.needsUpdate = true;
   }
 
-  // ---------- Perle sacrée (Mythique) : flotte et tourne devant la gueule ----------
-  const pearl = new THREE.Group();
-  const pearlBall = new THREE.Mesh(new THREE.IcosahedronGeometry(0.9, 1),
-    new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: new THREE.Color(0xffd9f6), emissiveIntensity: 1.4,
-      roughness: 0.3, flatShading: true }));
-  const pearlHalo = new THREE.Mesh(new THREE.RingGeometry(1.25, 1.45, 32),
-    new THREE.MeshBasicMaterial({ color: 0xff8fe6, transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
-  const pearlLight = new THREE.PointLight(0xff9fe9, 1.6, 18);
-  pearl.add(pearlBall, pearlHalo, pearlLight);
-  pearl.visible = false;
-  scene.add(pearl);
-  const headPos = new THREE.Vector3(), headQuat = new THREE.Quaternion(), headFwd = new THREE.Vector3();
-
-  function updatePearl(t, entry) {
-    const h = entry.bones.Head;
-    h.getWorldPosition(headPos);
-    h.getWorldQuaternion(headQuat);
-    headFwd.set(0, 0, 1).applyQuaternion(headQuat);
-    pearl.position.copy(headPos).addScaledVector(headFwd, 8.5);
-    pearl.position.x += Math.cos(t * 1.3) * 1.2;
-    pearl.position.y += 0.8 + Math.sin(t * 1.7) * 0.7;
-    pearlBall.rotation.y = t * 1.5;
-    pearlHalo.lookAt(camera.position);
-    pearlHalo.scale.setScalar(1 + 0.08 * Math.sin(t * 3));
-  }
-
   // ---------- Yeux qui brillent (Mythique) : une petite lumière dans chaque œil, éclaire les arcades ----------
   // Halo : un petit disque flou qui s'ajoute à la lumière de la scène (il ne cache rien derrière lui).
   const haloCanvas = document.createElement("canvas");
@@ -564,7 +538,6 @@ body {
       sparks.visible = !!r.sparkles;
       if (r.sparkles && r.sparkles !== sparkMode) { sparkMode = r.sparkles; sparkLife.fill(0); }
       sparkMat.uniforms.uColor.value.set(r.sparkles === "swirl" ? 0xd7c9ff : 0xffd36b);
-      pearl.visible = !!r.pearl;
       attachEyeLights(entry, r);
       status.hidden = true;
     }).catch(function () {
@@ -607,9 +580,8 @@ body {
         controls.target.lerp(followVec.copy(pivot.position).add(followOffset), Math.min(1, dt * 2.5));
         camera.position.add(followPrev.subVectors(controls.target, followPrev));
       }
-      if ((sparks.visible || pearl.visible) && !reduceMotion) scene.updateMatrixWorld();
+      if (sparks.visible && !reduceMotion) scene.updateMatrixWorld();
       if (sparks.visible && !reduceMotion) updateSparks(dt, currentEntry);
-      if (pearl.visible) updatePearl(clock.elapsedTime, currentEntry);
       if (current && current.iris && !reduceMotion) {
         const t = clock.elapsedTime * 0.25;
         (currentEntry.meshes.Fins || []).concat(currentEntry.meshes.Crest || []).forEach(function (o) {
