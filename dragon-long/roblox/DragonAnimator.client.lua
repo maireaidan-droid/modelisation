@@ -18,6 +18,13 @@ Ce qui est animé :
     fermeture rapide, réouverture plus lente avec un petit rebond, parfois double, parfois lent au repos ;
   - crinière, moustaches, barbichette : flottent, plus fort en vol ;
   - pattes : marche en diagonale, repliées vers l'arrière en vol ;
+  - actions (attribut « Action » du Model, réglé par un script serveur) : "Roar" (rugissement), "Bite" (morsure),
+    "Breath" (souffle, avec des particules qui sortent de la gueule). Pour relancer la même action, ajoute un
+    numéro après un # : "Roar#1", "Roar#2"… Style du souffle : attribut « BreathStyle » = "fire" (par défaut),
+    "ice", "gold" ou "void" ;
+  - virages : calculés tout seuls d'après la rotation du Model ; le corps se courbe dans le virage, la tête
+    regarde à l'intérieur et, en vol, le dragon s'incline ;
+  - mort : Mode = "Dead". Il s'effondre sur le flanc, se recourbe, ferme les yeux. Remettre "Idle" pour le relever ;
   - Mythique (Dragon_Long_v19_neant_rig) : les cristaux flottants (os Crest1 à Crest8) montent et descendent,
     et une vague de lumière court des cornes à la queue (parties Crest1…, Crack1…, BellyGlow1…, Horns, Eyes).
     Les autres dragons n'ont pas ces os ni ces parties : rien ne se passe pour eux.
@@ -45,12 +52,61 @@ local WHITE, LILAC = Color3.new(1, 1, 1), Color3.fromHex("#C9A2FF")
 -- center : recentrage du corps (1 = tout le corps ondule autour de son milieu, 0 = ancré au poitrail).
 local MODES = {
 	Idle = { up = 0.03, side = 0.06, speed = 1.2, helix = 0, center = 0, tuck = 0, walk = 0, mane = 0.12, maneSpeed = 1.6,
-		jaw = 0.04, bob = 0.15, bank = 0, head = 0.6 },
+		jaw = 0.04, bob = 0.15, bank = 0, head = 0.6, dead = 0 },
 	Walk = { up = 0.02, side = 0.13, speed = 3.4, helix = 0, center = 0, tuck = 0, walk = 1, mane = 0.2, maneSpeed = 3.2,
-		jaw = 0.07, bob = 0.2, bank = 0, head = 0.5 },
+		jaw = 0.07, bob = 0.2, bank = 0, head = 0.5, dead = 0 },
 	Fly = { up = 0.34, side = 0.16, speed = 2.0, helix = 1.57, center = 1, tuck = 1, walk = 0, mane = 0.42, maneSpeed = 5,
-		jaw = 0.12, bob = 0.8, bank = 0.1, head = 0.45 },
+		jaw = 0.12, bob = 0.8, bank = 0.1, head = 0.45, dead = 0 },
+	-- Mort : le corps cesse d'onduler, s'effondre sur le flanc en se courbant, yeux fermés, pattes molles.
+	Dead = { up = 0, side = 0, speed = 0.3, helix = 0, center = 0, tuck = 0, walk = 0, mane = 0.03, maneSpeed = 0.8,
+		jaw = 0, bob = 0, bank = 0, head = 1, dead = 1 },
 }
+
+-- Actions ponctuelles : durée en secondes.
+local ACTIONS = { Roar = 2.4, Bite = 0.9, Breath = 3.2 }
+local TURN_CURVE = 0.027 -- courbure du corps (rad par pas de colonne) pour 1 rad/s de virage
+local DEAD_DROP = 3.6    -- le dragon couché sur le flanc : le poitrail descend de tant de studs
+local MID = 34           -- milieu du corps (pas de colonne) : le corps se courbe autour de ce point
+local BREATH_STYLES = {  -- couleurs du souffle : début, milieu, fin
+	fire = { "#FFF299", "#FF7314", "#731008" },
+	ice = { "#F2FFFF", "#73E6FF", "#2659BF" },
+	gold = { "#FFFFD9", "#FFC740", "#B3660D" },
+	void = { "#FFD9FF", "#F240D9", "#4D149A" },
+}
+
+local function ramp(t, a, b) -- 0 avant a, 1 après b, transition douce entre les deux
+	local x = math.clamp((t - a) / (b - a), 0, 1)
+	return x * x * (3 - 2 * x)
+end
+
+-- Pose d'une action à l'instant t (voir demo/animator.js, même calcul).
+local function actionPose(name, t)
+	local o = { rear = 0, pitch = 0, yaw = 0, jaw = 0, push = 0, lift = 0, mane = 0, lash = 0, breath = 0 }
+	if name == "Roar" then
+		-- Se dresse, ouvre grand la gueule, secoue la tête, crinière hérissée, queue qui fouette.
+		local w = ramp(t, 0, 0.45) * (1 - ramp(t, 1.9, 2.4))
+		local open = ramp(t, 0.35, 0.6) * (1 - ramp(t, 1.8, 2.2))
+		local shake = ramp(t, 0.6, 0.8) * (1 - ramp(t, 1.5, 1.8))
+		o.rear, o.pitch, o.jaw, o.yaw = 0.55 * w, -0.35 * open, 0.95 * open, 0.13 * math.sin(t * 30) * shake
+		o.lift, o.mane, o.lash = 0.5 * w, 0.7 * w, 0.1 * w
+	elseif name == "Bite" then
+		-- Recule la tête, gueule ouverte, puis frappe vers l'avant et claque la mâchoire.
+		local wind = ramp(t, 0, 0.3) * (1 - ramp(t, 0.3, 0.42))
+		local strike = ramp(t, 0.3, 0.42) * (1 - ramp(t, 0.55, 0.9))
+		o.rear, o.pitch = 0.45 * wind - 0.3 * strike, -0.25 * wind + 0.3 * strike
+		o.jaw = 0.8 * ramp(t, 0.05, 0.28) * (1 - ramp(t, 0.44, 0.5))
+		o.push, o.mane = -0.9 * wind + 1.8 * strike, 0.3 * strike
+	elseif name == "Breath" then
+		-- Inspire (cou dressé, tête en arrière), puis souffle longtemps en balayant devant lui.
+		local inhale = ramp(t, 0, 0.9) * (1 - ramp(t, 0.9, 1.15))
+		local blow = ramp(t, 1.0, 1.2) * (1 - ramp(t, 2.6, 3.1))
+		o.rear, o.pitch = 0.5 * inhale + 0.1 * blow, -0.3 * inhale + 0.18 * blow
+		o.jaw, o.yaw = 0.1 * inhale + 0.85 * blow, 0.25 * math.sin((t - 1.1) * 2.4) * blow
+		o.push, o.lift, o.mane = -0.5 * inhale + 0.4 * blow, 0.3 * inhale, 0.4 * inhale + 0.3 * blow
+		o.breath = ramp(t, 1.05, 1.25) * (1 - ramp(t, 2.5, 2.9))
+	end
+	return o
+end
 
 -- Colonne, de la tête à la queue : { os, position le long du corps (pas de colonne), parent }.
 local SPINE = { { "Head", 0, "Neck" }, { "Neck", 5, "Neck2" }, { "Neck2", 10, "Root" }, { "Root", 14, nil } }
@@ -115,6 +171,7 @@ local function newState(model)
 	return {
 		model = model, bones = collectBones(model), glow = collectGlow(model), p = p,
 		phase = rng:NextNumber(0, 6), step = 0, flutter = 0, pulse = 0, t = 0,
+		action = nil, actionT = 0, breath = 0, turn = 0, deadT = 0, yaw = nil,
 		blinkIn = rng:NextNumber(1, 4), blink = nil,
 		headLook = 0, headTarget = 0,
 		gazeX = 0, gazeY = 0, gazeTx = 0, gazeTy = 0, gazeIn = 1, microX = 0, microY = 0, microIn = 0.5,
@@ -174,7 +231,27 @@ local function closure(b, tt, one)
 	return closeOnce(b, tt)
 end
 
-local function update(st, dt)
+-- Lance une action ponctuelle (Roar, Bite, Breath). Ignorée si le dragon est mort.
+local function play(st, name)
+	if ACTIONS[name] and st.p.dead < 0.5 then
+		st.action, st.actionT = name, 0
+	end
+end
+
+-- Vitesse de virage (rad/s, positif = vers la gauche) d'après la rotation du Model. La tête regarde vers +Z.
+local function turnRate(st, dt)
+	local look = -st.model:GetPivot().LookVector
+	local yaw = math.atan2(look.X, look.Z)
+	local prev = st.yaw or yaw
+	st.yaw = yaw
+	local d = math.atan2(math.sin(yaw - prev), math.cos(yaw - prev))
+	if dt <= 0 or math.abs(d) > 0.5 then
+		return 0 -- téléporté ou demi-tour instantané : ce n'est pas un virage
+	end
+	return d / dt
+end
+
+local function update(st, dt, turn)
 	local mode = st.model:GetAttribute("Mode")
 	local target = MODES[mode] or MODES.Idle
 	mode = MODES[mode] and mode or "Idle"
@@ -188,6 +265,21 @@ local function update(st, dt)
 	st.step += dt * 4.2 * p.walk
 	st.flutter += dt * p.maneSpeed
 	st.pulse += dt * (1.3 + 1.7 * p.tuck) -- vague de lumière (Mythique) : plus rapide en vol
+	st.turn += (math.clamp(turn or 0, -1.5, 1.5) - st.turn) * math.min(1, dt * 3)
+	st.deadT = (mode == "Dead") and (st.deadT + dt) or 0
+	local act = actionPose("", 0)
+	if st.action then
+		st.actionT += dt
+		if st.actionT >= ACTIONS[st.action] or p.dead > 0.5 then
+			st.action = nil
+		else
+			act = actionPose(st.action, st.actionT)
+		end
+	end
+	st.breath = act.breath
+	local d = p.dead
+	-- Frisson quand il tombe : une dernière vague rapide qui s'éteint.
+	local shiver = 0.1 * math.sin(st.deadT * 16) * math.exp(-st.deadT * 2.2) * d
 
 	-- 1. Orientation voulue de chaque morceau de colonne.
 	local ax, ay = {}, {}
@@ -196,6 +288,16 @@ local function update(st, dt)
 	end
 	ax.Head *= p.head -- la tête suit la vague, en plus calme
 	ay.Head *= p.head
+	-- Poses ajoutées à la forme du corps : cou dressé (actions), courbe du virage, corps recourbé (mort),
+	-- queue qui fouette (rugissement). Couché sur le flanc, l'axe « haut / bas » de la colonne devient
+	-- horizontal : c'est lui qui recourbe le corps en croissant sur le sol (nul au poitrail).
+	for _, b in ipairs(SPINE) do
+		local name, sp = b[1], b[2]
+		local front = 1 - ramp(sp, 4, 20) -- 1 pour la tête et le cou, 0 dès le poitrail
+		ax[name] += -act.rear * front + 0.022 * d * (14 - sp)
+		ay[name] += TURN_CURVE * st.turn * (MID - sp) * (1 - d) + shiver * math.sin(sp * 0.3)
+			+ act.lash * ramp(sp, 30, 60) * math.sin(st.t * 9 - sp * 0.15)
+	end
 
 	-- 2. Recentrage : position (haut/bas, côté) de chaque articulation par rapport au poitrail.
 	local py, px = { Root = 0 }, { Root = 0 }
@@ -220,8 +322,9 @@ local function update(st, dt)
 	for _, b in ipairs(SPINE) do
 		local name, parent = b[1], b[3]
 		if name == "Root" then
-			setBone(st, "Root", ax.Root, ay.Root, p.bank * math.sin(st.phase * 0.3),
-				cy + p.bob * math.sin(st.phase * 0.4 + 1) + 0.12 * p.walk * math.abs(math.sin(st.step)), 0, cx)
+			setBone(st, "Root", ax.Root, ay.Root, p.bank * math.sin(st.phase * 0.3) - 0.6 * st.turn * p.tuck - 1.35 * d,
+				cy + p.bob * math.sin(st.phase * 0.4 + 1) + 0.12 * p.walk * math.abs(math.sin(st.step)) + act.lift
+					- DEAD_DROP * d, act.push, cx)
 		elseif name ~= "Head" then
 			setBone(st, name, ax[name] - ax[parent], ay[name] - ay[parent], 0)
 		end
@@ -239,7 +342,7 @@ local function update(st, dt)
 		end
 		st.gazeTx, st.gazeTy = nx, ny
 		st.gazeIn = rng:NextNumber(0.6, 3)
-		st.headTarget = (mode == "Idle") and rng:NextNumber(-0.25, 0.25) or 0
+		st.headTarget = (mode == "Idle" and not st.action) and rng:NextNumber(-0.25, 0.25) or 0
 	end
 	st.microIn -= dt
 	if st.microIn <= 0 then
@@ -253,14 +356,16 @@ local function update(st, dt)
 	st.headLook += (st.headTarget - st.headLook) * math.min(1, dt * 1.5)
 
 	-- Tête : suit la vague (en plus calme), suit le regard avec retard et lève ou baisse un peu le nez avec lui.
-	setBone(st, "Head", ax.Head - ax.Neck + 0.04 * math.sin(st.t * 0.9) - 0.06 * st.gazeY, ay.Head - ay.Neck + st.headLook, 0)
-	setBone(st, "Jaw", p.jaw * (0.6 + 0.4 * math.sin(st.t * 1.3)), 0, 0)
+	-- En virage, la tête regarde à l'intérieur ; mort, elle retombe, gueule entrouverte.
+	setBone(st, "Head", ax.Head - ax.Neck + (0.04 * math.sin(st.t * 0.9) - 0.06 * st.gazeY) * (1 - d) + act.pitch + 0.25 * d,
+		ay.Head - ay.Neck + st.headLook * (1 - d) + act.yaw + 0.45 * st.turn * (1 - d), 0)
+	setBone(st, "Jaw", math.max(p.jaw * (0.6 + 0.4 * math.sin(st.t * 1.3)), act.jaw) + 0.2 * d, 0, 0)
 
 	-- Clignement : fermeture très rapide, courte pause, réouverture plus lente avec un léger rebond.
 	-- Parfois un double clignement, et au repos parfois un clignement lent et paresseux.
 	-- L'œil droit suit le gauche avec 15 ms de retard.
 	st.blinkIn -= dt
-	if st.blinkIn <= 0 and not st.blink then
+	if st.blinkIn <= 0 and not st.blink and not st.action then
 		if mode == "Idle" and rng:NextNumber(0, 1) < 0.2 then
 			st.blink = { t = 0, close = 0.3, hold = 0.25, open = 0.45, twice = false }
 		else
@@ -280,6 +385,7 @@ local function update(st, dt)
 			st.blink = nil
 		end
 	end
+	lidL, lidR = math.max(lidL, d), math.max(lidR, d) -- mort : yeux fermés
 	setBone(st, "Lid_L", BLINK_UP * lidL, 0, 0)
 	setBone(st, "Lid_R", BLINK_UP * lidR, 0, 0)
 	setBone(st, "LidLow_L", -BLINK_LOW * math.max(0, lidL), 0, 0)
@@ -294,7 +400,7 @@ local function update(st, dt)
 
 	-- Crinière, moustaches, barbichette : flottent, se soulèvent en vol et traînent derrière les mouvements
 	-- de la tête.
-	local f, m, lift = st.flutter, p.mane, 0.22 * p.tuck
+	local f, m, lift = st.flutter, p.mane + 0.25 * act.mane, 0.22 * p.tuck + act.mane
 	local drag, dragY = -0.8 * (ax.Neck - ax.Neck2), -0.8 * (ay.Neck - ay.Neck2)
 	setBone(st, "Mane_Top", lift + drag + 0.5 * m * math.sin(f), dragY + m * math.sin(f * 1.3 + 1), 0)
 	setBone(st, "Mane_L", lift + drag + 0.6 * m * math.sin(f + 2), dragY + m * math.sin(f * 1.1 + 0.5), 0)
@@ -318,15 +424,63 @@ local function update(st, dt)
 		local ph = st.step + info[1]
 		local sw, up = math.sin(ph), math.max(0, math.cos(ph))
 		local flow = 0.5 * (bodyAngles(st, info[2] + 6)) * p.tuck
-		setBone(st, leg .. "_Upper", -0.45 * sw * p.walk + 0.9 * p.tuck + flow, 0, 0)
-		setBone(st, leg .. "_Fore", 0.6 * up * p.walk + 0.6 * p.tuck + flow, 0, 0)
-		setBone(st, leg .. "_Foot", -0.35 * up * p.walk - 0.4 * p.tuck, 0, 0)
+		-- Mort : pattes molles, un peu écartées du corps.
+		setBone(st, leg .. "_Upper", -0.45 * sw * p.walk + 0.9 * p.tuck + flow + 0.45 * d, 0, 0)
+		setBone(st, leg .. "_Fore", 0.6 * up * p.walk + 0.6 * p.tuck + flow + 0.35 * d, 0, 0)
+		setBone(st, leg .. "_Foot", -0.35 * up * p.walk - 0.4 * p.tuck - 0.2 * d, 0, 0)
 	end
+end
+
+-- Souffle : un ParticleEmitter (créé chez le joueur seulement) dans l'os de la mâchoire, qui projette les
+-- particules vers l'avant de la tête. Son débit suit st.breath (0 à 1).
+local function updateBreath(st)
+	local fx = st.breathFx
+	if not fx then
+		if st.breath <= 0 then
+			return
+		end
+		local jaw = st.bones.Jaw and st.bones.Jaw[1]
+		if not jaw then
+			return
+		end
+		fx = Instance.new("ParticleEmitter")
+		fx.Name = "DragonBreath"
+		fx.EmissionDirection = Enum.NormalId.Back -- +Z de l'os = vers l'avant de la gueule
+		fx.SpreadAngle = Vector2.new(14, 14)
+		fx.Speed = NumberRange.new(26, 36)
+		fx.Drag = 0.9
+		fx.Acceleration = Vector3.new(0, 6, 0)
+		fx.Lifetime = NumberRange.new(0.85, 1.1)
+		fx.LightEmission = 1
+		fx.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.6), NumberSequenceKeypoint.new(1, 4) })
+		fx.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 1) })
+		fx.Rate = 0
+		fx.Parent = jaw
+		st.breathFx = fx
+	end
+	local style = BREATH_STYLES[st.model:GetAttribute("BreathStyle") or "fire"] or BREATH_STYLES.fire
+	if st.breathStyle ~= style then
+		st.breathStyle = style
+		fx.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromHex(style[1])),
+			ColorSequenceKeypoint.new(0.35, Color3.fromHex(style[2])),
+			ColorSequenceKeypoint.new(1, Color3.fromHex(style[3])),
+		})
+	end
+	fx.Rate = 300 * st.breath
+	fx.Enabled = st.breath > 0.02
 end
 
 local function track(model)
 	if model:IsA("Model") and not dragons[model] then
 		dragons[model] = newState(model)
+		-- Actions : « Roar », « Bite », « Breath » (éventuellement suivies de #numéro pour relancer la même).
+		model:GetAttributeChangedSignal("Action"):Connect(function()
+			local name = string.match(model:GetAttribute("Action") or "", "^(%a+)")
+			if dragons[model] and name then
+				play(dragons[model], name)
+			end
+		end)
 		-- Si les os arrivent après le modèle (chargement en streaming), on les recompte.
 		model.DescendantAdded:Connect(function(d)
 			if d:IsA("Bone") and dragons[model] then
@@ -364,7 +518,10 @@ RunService.RenderStepped:Connect(function(dt)
 		if not model:IsDescendantOf(workspace) then
 			dragons[model] = nil
 		elseif cam and (model:GetPivot().Position - cam.CFrame.Position).Magnitude < MAX_DISTANCE then
-			update(st, dt)
+			update(st, dt, turnRate(st, dt))
+			updateBreath(st)
+		else
+			st.yaw = nil -- trop loin : on repartira de zéro pour le calcul du virage
 		end
 	end
 end)

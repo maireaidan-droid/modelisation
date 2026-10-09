@@ -73,7 +73,10 @@ Le Mythique a en plus 8 os `Crest1`…`Crest8` (cristaux flottants) et des parti
 - `generateur/build_rig.py` exporte `objets/Dragon_Long_v19_rig.glb` (même géométrie, plus le squelette et les poids de peau) et `objets/Dragon_Long_v19_rig.json` (liste des os).
 - `roblox/DragonAnimator.client.lua` (LocalScript, StarterPlayerScripts) anime les os ; l'attribut `Mode` du Model choisit `Idle`, `Walk` ou `Fly`.
 - `roblox/DragonDemo.server.lua` (Script, ServerScriptService, optionnel) fait enchaîner repos, marche et vol en cercle.
-- `demo/animator.js` est la même logique en JavaScript, utilisée par la démo web.
+- `demo/animator.js` est la même logique en JavaScript, utilisée par la démo web (`demo/effects.js` : particules du souffle).
+- Actions (attribut `Action` du Model) : `Roar` (rugissement), `Bite` (morsure), `Breath` (souffle ; style avec l'attribut
+  `BreathStyle` = `fire`, `ice`, `gold`, `void`). Mode `Dead` : il s'effondre sur le flanc. Les virages sont déduits tout
+  seuls de la rotation du Model : le corps se courbe, la tête regarde dans le virage, il s'incline en vol.
 
 ## Comparer deux versions
 ```

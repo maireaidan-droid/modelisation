@@ -123,6 +123,13 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
     <button data-mode="Idle" aria-pressed="true">Repos</button>
     <button data-mode="Walk" aria-pressed="false">Marche</button>
     <button data-mode="Fly" aria-pressed="false">Vol</button>
+    <button data-mode="Dead" aria-pressed="false">Mort</button>
+  </div>
+  <div class="sep" aria-hidden="true"></div>
+  <div class="group" role="group" aria-label="Actions">
+    <button data-action="Roar">Rugir</button>
+    <button data-action="Bite">Mordre</button>
+    <button data-action="Breath">Souffle</button>
   </div>
   <div class="sep" aria-hidden="true"></div>
   <div class="group">
@@ -141,6 +148,7 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="animator.js"></script>
+<script src="effects.js"></script>
 <script>
 (function () {
   const stage = document.getElementById("stage");
@@ -196,7 +204,10 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
   // Os du squelette : pose de repos, puis l'animateur (le même calcul que le script Roblox) les fait bouger.
   const bones = {}, rest = {};
   const euler = new THREE.Euler(), quat = new THREE.Quaternion(), off = new THREE.Vector3();
-  let anim = null;
+  let anim = null, mouth = null;
+  // Souffle de feu : particules qui sortent de la gueule pendant l'action « Souffle ».
+  const breath = DragonEffects.createBreath(THREE, scene);
+  const mouthW = new THREE.Vector3(), headQ = new THREE.Quaternion(), breathDir = new THREE.Vector3();
   function setBone(name, rx, ry, rz, ty, tz, tx) {
     const b = bones[name];
     if (!b) return;
@@ -231,6 +242,7 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
     camera.aspect = w / h;
     camera.fov = w < 600 ? 50 : 38;
     camera.updateProjectionMatrix();
+    breath.setScale(h * 0.03);
   }
   window.addEventListener("resize", resize);
   resize();
@@ -256,6 +268,9 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
       }
     });
     anim = DragonAnimator.create(bones, setBone);
+    const tongue = [];
+    model.traverse(function (o) { if (o.isMesh && o.name.indexOf("Tongue") === 0) tongue.push(o); });
+    mouth = DragonEffects.mouthInHead(THREE, tongue, bones.Head);
     pivot.add(model);
     status.hidden = true;
   }
@@ -285,26 +300,53 @@ button[aria-pressed="true"] { background: var(--jade); border-color: var(--jade)
       document.querySelectorAll("[data-mode]").forEach(function (o) { o.setAttribute("aria-pressed", String(o === b)); });
     });
   });
+  document.querySelectorAll("[data-action]").forEach(function (b) {
+    b.addEventListener("click", function () { if (anim) anim.play(b.dataset.action); });
+  });
   document.querySelectorAll("[data-view]").forEach(function (b) {
     b.addEventListener("click", function () { goTo(b.dataset.view); });
   });
   controls.addEventListener("start", function () { tween = null; });
 
   const clock = new THREE.Clock();
-  let flyW = 0, flyAngle = 0, spinYaw = 0;
+  let flyW = 0, walkW = 0, flyAngle = 0, walkAngle = 0, spinYaw = 0, yaw = 0;
   const followVec = new THREE.Vector3(), followPrev = new THREE.Vector3(), followOffset = new THREE.Vector3(0, 8, 0);
+  const pathPos = new THREE.Vector3(), lastPos = new THREE.Vector3();
+  // Parcours en 8 : le dragon tourne à gauche puis à droite, pour montrer les virages.
+  function eight(a, R, out) { return out.set(R * Math.sin(a), 0, R * Math.sin(a) * Math.cos(a)); }
+  function wrap(a) { return Math.atan2(Math.sin(a), Math.cos(a)); }
   function loop() {
     const dt = Math.min(clock.getDelta(), 0.05);
-    if (anim) anim.update(reduceMotion ? 0 : dt, mode);
     if (spin) spinYaw += dt * 0.25;
-    // En vol, le dragon avance sur une grande boucle en s'inclinant dans le virage ; la caméra le suit.
+    // En vol (grand 8) et en marche (petit 8), le dragon se déplace ; la caméra le suit.
     flyW += ((mode === "Fly" ? 1 : 0) - flyW) * Math.min(1, dt * 0.8);
-    flyAngle += dt * 0.32 * flyW;
-    const R = 38 * flyW;
-    pivot.position.set(R * Math.sin(flyAngle), 7 * flyW + 2.5 * flyW * Math.sin(flyAngle * 2.3), R * Math.cos(flyAngle) - R);
-    pivot.rotation.set(0, (flyAngle + Math.PI / 2) * flyW + spinYaw, 0, "YXZ");
-    pivot.rotation.z = -0.22 * flyW;
-    if (flyW > 0.01 && !tween) {
+    walkW += ((mode === "Walk" ? 1 : 0) - walkW) * Math.min(1, dt * 0.8);
+    flyAngle += dt * 0.22 * flyW;
+    walkAngle += dt * 0.16 * walkW;
+    pathPos.copy(eight(flyAngle, 42, followVec).multiplyScalar(flyW)).add(eight(walkAngle, 26, followPrev).multiplyScalar(walkW));
+    pathPos.y = 7 * flyW + 2.5 * flyW * Math.sin(flyAngle * 2.3);
+    const vx = (pathPos.x - lastPos.x) / Math.max(dt, 1e-4), vz = (pathPos.z - lastPos.z) / Math.max(dt, 1e-4);
+    lastPos.copy(pathPos);
+    const moving = Math.hypot(vx, vz) > 0.6;
+    const targetYaw = moving ? Math.atan2(vx, vz) : spinYaw;
+    const prevYaw = yaw;
+    yaw += wrap(targetYaw - yaw) * Math.min(1, dt * (moving ? 6 : 1.5));
+    // Vitesse de virage donnée à l'animateur (le tour sur soi-même de « Rotation » n'en est pas un).
+    const turn = moving && dt > 0 ? wrap(yaw - prevYaw) / dt : 0;
+    if (anim) {
+      anim.update(reduceMotion ? 0 : dt, mode, turn);
+      if (mouth) {
+        scene.updateMatrixWorld();
+        mouthW.copy(mouth);
+        bones.Head.localToWorld(mouthW);
+        bones.Head.getWorldQuaternion(headQ);
+        breathDir.set(0, -0.12, 1).applyQuaternion(headQ).normalize();
+        breath.update(reduceMotion ? 0 : dt, anim.state.breath, mouthW, breathDir);
+      }
+    }
+    pivot.position.copy(pathPos);
+    pivot.rotation.set(0, yaw, 0, "YXZ");
+    if (Math.max(flyW, walkW) > 0.01 && !tween) {
       const before = followPrev.copy(controls.target);
       controls.target.lerp(followVec.copy(pivot.position).add(followOffset), Math.min(1, dt * 2.5));
       camera.position.add(before.subVectors(controls.target, before));

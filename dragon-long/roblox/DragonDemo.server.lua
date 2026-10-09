@@ -4,9 +4,10 @@ DragonDemo (optionnel) : fait vivre un dragon pour tester les animations.
 À placer dans : ServerScriptService (Script). Le dragon doit être dans le Workspace et s'appeler « Dragon_Long_Test »
 (c'est le nom que lui donne setup_dragon_long.lua), sinon change DRAGON_NAME.
 
-Cycle : repos (6 s), marche en ligne droite (8 s), vol en cercle en prenant de la hauteur (12 s), puis retour au sol.
-Le serveur ne fait que déplacer le Model et régler l'attribut « Mode » ; les os sont animés par DragonAnimator chez
-chaque joueur.
+Cycle : repos et rugissement, marche en ligne droite puis morsure, vol en cercle (le corps se courbe dans le
+virage), atterrissage et souffle, puis il meurt et se relève.
+Le serveur ne fait que déplacer le Model et régler les attributs « Mode » et « Action » ; les os sont animés par
+DragonAnimator chez chaque joueur.
 ]]
 
 local RunService = game:GetService("RunService")
@@ -25,6 +26,12 @@ local start = dragon:GetPivot()
 local function setMode(m)
 	dragon:SetAttribute("Mode", m)
 end
+-- Lance une action (Roar, Bite, Breath). Le numéro après # permet de relancer la même action plusieurs fois.
+local actionCount = 0
+local function playAction(name)
+	actionCount += 1
+	dragon:SetAttribute("Action", name .. "#" .. actionCount)
+end
 
 local function run(duration, stepFn)
 	local t = 0
@@ -36,15 +43,20 @@ local function run(duration, stepFn)
 end
 
 while true do
-	-- Repos
+	-- Repos, puis rugissement
 	setMode("Idle")
-	task.wait(6)
+	task.wait(4)
+	playAction("Roar")
+	task.wait(3)
 
 	-- Marche : avance tout droit (la tête regarde vers l'avant du modèle).
 	setMode("Walk")
 	run(8, function(dt)
 		dragon:PivotTo(dragon:GetPivot() * CFrame.new(0, 0, HEAD_FORWARD * WALK_SPEED * dt))
 	end)
+	setMode("Idle")
+	playAction("Bite")
+	task.wait(1.5)
 
 	-- Vol : décolle et tourne en cercle autour du point de départ.
 	setMode("Fly")
@@ -62,6 +74,18 @@ while true do
 		-- lookAt tourne l'avant Roblox (-Z) vers la cible ; FACE retourne le dragon pour que ce soit sa tête.
 		dragon:PivotTo(CFrame.lookAt(pos, Vector3.new(ahead.X, pos.Y, ahead.Z)) * FACE)
 	end)
+
+	-- Au sol : souffle (feu par défaut ; attribut « BreathStyle » = "ice", "gold" ou "void" pour changer).
+	setMode("Idle")
+	task.wait(1.5)
+	playAction("Breath")
+	task.wait(4)
+
+	-- Mort, puis il se relève.
+	setMode("Dead")
+	task.wait(5)
+	setMode("Idle")
+	task.wait(2)
 
 	-- Retour au point de départ pour recommencer.
 	dragon:PivotTo(start)

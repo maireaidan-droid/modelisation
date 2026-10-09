@@ -69,6 +69,7 @@ body {
   border: 1px solid var(--line);
   border-radius: 999px;
 }
+.modes.actions { top: calc(env(safe-area-inset-top, 0px) + 64px); }
 .modes button {
   font: 700 12px/1 var(--body);
   color: var(--ink);
@@ -165,6 +166,12 @@ body {
   <button data-mode="Idle" aria-pressed="true">Repos</button>
   <button data-mode="Walk" aria-pressed="false">Marche</button>
   <button data-mode="Fly" aria-pressed="false">Vol</button>
+  <button data-mode="Dead" aria-pressed="false">Mort</button>
+</div>
+<div class="modes actions" role="group" aria-label="Actions">
+  <button data-action="Roar">Rugir</button>
+  <button data-action="Bite">Mordre</button>
+  <button data-action="Breath">Souffle</button>
 </div>
 
 <div id="status">Chargement du dragon…</div>
@@ -175,36 +182,37 @@ body {
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="animator.js"></script>
+<script src="effects.js"></script>
 <script>
 (function () {
   // Les 4 raretés : palette (couleur de chaque partie, en sRGB comme dans Roblox), lueur (0 = aucune),
   // forme (fichier du modèle) et particules.
   const RARITIES = [
-    { id: "commun", rarity: "Commun", color: "#9aa3a8", name: "Dragon de Jade", file: "dragon_v19_rig.txt",
+    { id: "commun", breath: "fire", rarity: "Commun", color: "#9aa3a8", name: "Dragon de Jade", file: "dragon_v19_rig.txt",
       desc: "Le dragon de base : palette jade, or et rouge.",
       points: ["Palette simple", "Forme de base"],
       parts: { Body: "#2F7D63", Belly: "#E2B65C", Fins: "#C8432F", Horns: "#E6DCC3", Whiskers: "#F0C24B",
                Eyes: "#FFD23F", Pupils: "#17120E", Mouth: "#8E2529", Tongue: "#B9434C" },
       glow: {} },
-    { id: "rare", rarity: "Rare", color: "#4c8dff", name: "Dragon de Braise", file: "dragon_v19_rig.txt",
+    { id: "rare", breath: "fire", rarity: "Rare", color: "#4c8dff", name: "Dragon de Braise", file: "dragon_v19_rig.txt",
       desc: "Écailles couleur de lave refroidie ; sa crinière et sa crête rougeoient comme des braises.",
       points: ["Palette feu", "Crinière et crête lumineuses"],
       parts: { Body: "#6E1D1A", Belly: "#E8A33D", Fins: "#FF6A1A", Horns: "#2A2020", Whiskers: "#FFB12E",
                Eyes: "#FFE14A", Pupils: "#1A0A05", Mouth: "#7A1515", Tongue: "#C2453F" },
       glow: { Fins: 0.55, Whiskers: 0.3 } },
-    { id: "epique", rarity: "Épique", color: "#a55bff", name: "Dragon de Glace", file: "dragon_v19_glace_rig.txt",
+    { id: "epique", breath: "ice", rarity: "Épique", color: "#a55bff", name: "Dragon de Glace", file: "dragon_v19_glace_rig.txt",
       desc: "Une crête et une queue de cristaux, une couronne de cornes : sa forme change, pas seulement ses couleurs.",
       points: ["Forme spéciale : cristaux", "Cornes en couronne", "Palette glacée qui luit"],
       parts: { Body: "#4A82AE", Belly: "#DCEEF6", Fins: "#6FE6FF", Horns: "#E3EEF5", Whiskers: "#C8F4FF",
                Eyes: "#7FE3FF", Pupils: "#0E2233", Mouth: "#5B2A4A", Tongue: "#B85A7A" },
       glow: { Fins: 0.45, Whiskers: 0.2 } },
-    { id: "legendaire", rarity: "Légendaire", color: "#ffb938", name: "Dragon Céleste", file: "dragon_v19_celeste_rig.txt",
+    { id: "legendaire", breath: "gold", rarity: "Légendaire", color: "#ffb938", name: "Dragon Céleste", file: "dragon_v19_celeste_rig.txt",
       desc: "Nacre et or, de grands bois à trois branches, des cristaux de lumière et une aura d'étincelles dorées.",
       points: ["Forme unique : grands bois", "Palette nacre et or lumineuse", "Aura de particules"],
       parts: { Body: "#E3D8C4", Belly: "#D9A93F", Fins: "#FFD24D", Horns: "#E8B84F", Whiskers: "#FFF0A8",
                Eyes: "#7FF7FF", Pupils: "#1B1406", Mouth: "#8E2529", Tongue: "#C25A5A" },
       glow: { Fins: 0.8, Whiskers: 0.45, Horns: 0.15 }, sparkles: "rise" },
-    { id: "mythique", rarity: "Mythique", color: "#ff4fd8", name: "Dragon du Néant", file: "dragon_v19_neant_rig.txt",
+    { id: "mythique", breath: "void", rarity: "Mythique", color: "#ff4fd8", name: "Dragon du Néant", file: "dragon_v19_neant_rig.txt",
       desc: "Né de la nuit entre les étoiles : son corps noir laisse passer une vague de lumière des cornes à la " +
             "queue et allume les fissures de son corps. Une aura d'ombre l'entoure et il aspire la lumière autour de lui.",
       points: ["Pulsation : vague de lumière tête → queue", "Fissures de lumière, cristaux flottants",
@@ -237,6 +245,7 @@ body {
   rim.position.set(-35, 20, -40);
   scene.add(rim);
 
+  const breath = DragonEffects.createBreath(THREE, scene);   // souffle (feu, glace, or ou néant)
   const controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
@@ -255,6 +264,7 @@ body {
     camera.fov = w < 600 ? 52 : 38;
     camera.updateProjectionMatrix();
     sparkMat.uniforms.uScale.value = h * 0.03;     // taille des étincelles en pixels, suivant la hauteur de l'écran
+    breath.setScale(h * 0.03);
   }
   window.addEventListener("resize", resize);
 
@@ -315,6 +325,7 @@ body {
         }
         entry.meshes = meshes;
         entry.bones = bones;
+        entry.mouth = DragonEffects.mouthInHead(THREE, meshes.Tongue, bones.Head);   // départ du souffle
         entry.anim = DragonAnimator.create(bones, function (name, rx, ry, rz, ty, tz, tx) {
           const b = bones[name];
           if (!b) return;
@@ -606,26 +617,40 @@ body {
     loadModel("dragon_v19_neant_rig.txt");
   }, 1500);
 
+  // ---------- Souffle : feu, glace, or ou néant selon la rareté ----------
+  const mouthW = new THREE.Vector3(), headQ = new THREE.Quaternion(), breathDir = new THREE.Vector3();
+  document.querySelectorAll("[data-action]").forEach(function (b) {
+    b.addEventListener("click", function () { if (currentEntry) currentEntry.anim.play(b.dataset.action); });
+  });
+
   // ---------- Boucle ----------
   const clock = new THREE.Clock();
-  let flyW = 0, flyAngle = 0;
+  let flyW = 0, flyAngle = 0, lastYaw = 0;
   const followPrev = new THREE.Vector3(), followVec = new THREE.Vector3(), followOffset = new THREE.Vector3(0, 8, 0);
   function loop() {
     const dt = Math.min(clock.getDelta(), 0.05);
     if (currentEntry) {
-      currentEntry.anim.update(reduceMotion ? 0 : dt, mode);
-      // En vol, le dragon avance sur une grande boucle et la caméra le suit.
+      // En vol, le dragon avance sur une grande boucle (il tourne à gauche) et la caméra le suit.
       flyW += ((mode === "Fly" ? 1 : 0) - flyW) * Math.min(1, dt * 0.8);
       flyAngle += dt * 0.32 * flyW;
-      const R = 38 * flyW;
+      const R = 38 * flyW, yaw = (flyAngle + Math.PI / 2) * flyW;
+      const turn = dt > 0 ? (yaw - lastYaw) / dt : 0;     // vitesse de virage, pour que le corps se courbe
+      lastYaw = yaw;
+      currentEntry.anim.update(reduceMotion ? 0 : dt, mode, turn);
       pivot.position.set(R * Math.sin(flyAngle), 7 * flyW + 2.5 * flyW * Math.sin(flyAngle * 2.3), R * Math.cos(flyAngle) - R);
-      pivot.rotation.set(0, (flyAngle + Math.PI / 2) * flyW, -0.22 * flyW, "YXZ");
+      pivot.rotation.set(0, yaw, 0, "YXZ");
+      scene.updateMatrixWorld();
+      mouthW.copy(currentEntry.mouth);
+      currentEntry.bones.Head.localToWorld(mouthW);
+      currentEntry.bones.Head.getWorldQuaternion(headQ);
+      breathDir.set(0, -0.12, 1).applyQuaternion(headQ).normalize();
+      breath.setStyle(current ? current.breath : "fire");
+      breath.update(reduceMotion ? 0 : dt, currentEntry.anim.state.breath, mouthW, breathDir);
       if (flyW > 0.01) {
         followPrev.copy(controls.target);
         controls.target.lerp(followVec.copy(pivot.position).add(followOffset), Math.min(1, dt * 2.5));
         camera.position.add(followPrev.subVectors(controls.target, followPrev));
       }
-      if (sparks.visible && !reduceMotion) scene.updateMatrixWorld();
       if (sparks.visible && !reduceMotion) updateSparks(dt, currentEntry);
       if (current && current.iris && !reduceMotion) {
         const t = clock.elapsedTime * 0.25;

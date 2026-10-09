@@ -80,4 +80,16 @@ Fichiers fournis avec le modèle : `DragonAnimator.client.lua` et `DragonDemo.se
 2. Crée un **LocalScript** `DragonAnimator` dans `StarterPlayer > StarterPlayerScripts` et colle `DragonAnimator.client.lua`. Il anime chez chaque joueur tout Model tagué `DragonLong` (le script de réglage ajoute le tag) ou dont le nom commence par `Dragon_Long`.
 3. Le mode se règle avec l'attribut **`Mode`** du Model : `Idle` (repos), `Walk` (marche), `Fly` (vol).
 4. Pour tester : crée un **Script** `DragonDemo` dans `ServerScriptService` et colle `DragonDemo.server.lua`. Le dragon `Dragon_Long_Test` enchaîne repos, marche et vol en cercle. **Si le dragon avance à reculons**, mets `HEAD_FORWARD = -1` en haut du script.
-5. Lance le jeu (Play) et montre-moi une vidéo ou des captures : ondulation, clignement, pattes en marche, pattes repliées en vol.
+5. Lance le jeu (Play) et montre-moi une vidéo ou des captures : ondulation, clignement, pattes en marche, pattes repliées en vol,
+   corps qui se courbe dans le virage en vol, rugissement, morsure, souffle de feu, mort puis relevé.
+
+### Actions, virages et mort
+- **Actions** : un script serveur règle l'attribut `Action` du Model : `"Roar"` (rugissement), `"Bite"` (morsure),
+  `"Breath"` (souffle). Pour relancer la même action, ajoute `#` et un numéro qui change : `"Roar#1"`, `"Roar#2"`…
+  (`DragonDemo` le fait avec sa fonction `playAction`).
+- **Souffle** : des particules sortent de la gueule (créées chez chaque joueur dans l'os `Jaw`). L'attribut
+  `BreathStyle` choisit les couleurs : `"fire"` (par défaut), `"ice"`, `"gold"`, `"void"`.
+- **Virages** : rien à faire, `DragonAnimator` les déduit de la rotation du Model ; le corps se courbe, la tête regarde
+  dans le virage et, en vol, le dragon s'incline.
+- **Mort** : `Mode = "Dead"` ; il s'effondre sur le flanc, se recourbe et ferme les yeux. `Mode = "Idle"` pour le relever.
+  Vérifie qu'il ne s'enfonce pas dans le sol ; sinon dis-le-moi (réglage `DEAD_DROP` en haut de `DragonAnimator`).
