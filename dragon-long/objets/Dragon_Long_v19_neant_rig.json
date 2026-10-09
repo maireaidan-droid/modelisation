@@ -1,6 +1,6 @@
 {
   "name": "Dragon_Long_v19_neant_rig",
-  "tris": 28774,
+  "tris": 27882,
   "bones": [
     "Root",
     "Neck2",
@@ -19,6 +19,12 @@
     "S12",
     "S13",
     "S14",
+    "Crest1",
+    "Crest2",
+    "Crest3",
+    "Crest4",
+    "Crest5",
+    "Crest6",
     "LegFL_Upper",
     "LegFL_Fore",
     "LegFL_Foot",
@@ -66,6 +72,12 @@
     "S12": "S11",
     "S13": "S12",
     "S14": "S13",
+    "Crest1": "Neck2",
+    "Crest2": "S01",
+    "Crest3": "S02",
+    "Crest4": "S04",
+    "Crest5": "S07",
+    "Crest6": "S08",
     "LegFL_Upper": "Root",
     "LegFL_Fore": "LegFL_Upper",
     "LegFL_Foot": "LegFL_Fore",
@@ -108,17 +120,17 @@
   },
   "parts": {
     "Body": {
-      "tris": 15674,
+      "tris": 14226,
       "color": "#2F7D63",
       "material": "SmoothPlastic"
     },
     "Belly": {
-      "tris": 3362,
+      "tris": 386,
       "color": "#E2B65C",
       "material": "SmoothPlastic"
     },
     "Fins": {
-      "tris": 4746,
+      "tris": 3618,
       "color": "#C8432F",
       "material": "SmoothPlastic"
     },
@@ -151,6 +163,71 @@
       "tris": 192,
       "color": "#B9434C",
       "material": "SmoothPlastic"
+    },
+    "BellyGlow1": {
+      "tris": 462,
+      "color": "#E2B65C",
+      "material": "SmoothPlastic"
+    },
+    "BellyGlow2": {
+      "tris": 336,
+      "color": "#E2B65C",
+      "material": "SmoothPlastic"
+    },
+    "BellyGlow3": {
+      "tris": 336,
+      "color": "#E2B65C",
+      "material": "SmoothPlastic"
+    },
+    "BellyGlow4": {
+      "tris": 336,
+      "color": "#E2B65C",
+      "material": "SmoothPlastic"
+    },
+    "BellyGlow5": {
+      "tris": 336,
+      "color": "#E2B65C",
+      "material": "SmoothPlastic"
+    },
+    "BellyGlow6": {
+      "tris": 126,
+      "color": "#E2B65C",
+      "material": "SmoothPlastic"
+    },
+    "Crest1": {
+      "tris": 192,
+      "color": "#C8432F",
+      "material": "SmoothPlastic"
+    },
+    "Crest2": {
+      "tris": 120,
+      "color": "#C8432F",
+      "material": "SmoothPlastic"
+    },
+    "Crest3": {
+      "tris": 168,
+      "color": "#C8432F",
+      "material": "SmoothPlastic"
+    },
+    "Crest4": {
+      "tris": 192,
+      "color": "#C8432F",
+      "material": "SmoothPlastic"
+    },
+    "Crest5": {
+      "tris": 120,
+      "color": "#C8432F",
+      "material": "SmoothPlastic"
+    },
+    "Crest6": {
+      "tris": 120,
+      "color": "#C8432F",
+      "material": "SmoothPlastic"
+    },
+    "Nebula": {
+      "tris": 1816,
+      "color": "#B98CFF",
+      "material": "Neon"
     }
   }
 }

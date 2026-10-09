@@ -14,6 +14,7 @@
   const PUPIL_FWD = { L: -1, R: 1 };  // sens « vers l'avant » de l'axe X de chaque pupille
   const SEG = 0.8;                 // longueur du corps par pas de colonne (studs)
   const KAPPA = 0.11;              // nombre d'onde : ~1,3 vague sur toute la longueur du corps
+  const PULSE_SEGMENTS = 8, PULSE_STEP = 0.6;  // Mythique : tronçons de la vague de lumière, décalage entre deux
 
   // up / side : amplitude de la vague verticale / latérale (rad) ; speed : vitesse de la vague (rad/s) ;
   // helix : décalage entre les deux (pi/2 = chaque anneau décrit un cercle, le corps s'enroule en spirale) ;
@@ -56,7 +57,7 @@
   function create(bones, setBone) {
     // setBone(name, rx, ry, rz, ty, tz, tx) : rotation (X puis Y puis Z, comme CFrame.Angles) + décalage
     // le long des axes de l'os
-    const st = { p: Object.assign({}, MODES.Idle), phase: 0, step: 0, flutter: 0, t: 0,
+    const st = { p: Object.assign({}, MODES.Idle), phase: 0, step: 0, flutter: 0, pulse: 0, t: 0,
       blinkIn: 2, blink: null, headLook: 0, headTarget: 0,
       gazeX: 0, gazeY: 0, gazeTx: 0, gazeTy: 0, gazeIn: 1, microX: 0, microY: 0, microIn: 0.5 };
     function rnd(a, b) { return a + Math.random() * (b - a); }
@@ -68,6 +69,11 @@
       return [p.up * env * Math.sin(a), p.side * env * Math.sin(a + p.helix)];
     }
 
+    // Vague de lumière : 0 (éteint) à 1 (pic) pour le tronçon c (0 = cornes, 1 à 8 de la tête vers la queue).
+    function pulseAt(c) {
+      return Math.pow(Math.max(0, Math.sin(st.pulse - PULSE_STEP * c)), 6);
+    }
+
     function update(dt, mode) {
       st.t += dt;
       const target = MODES[mode] || MODES.Idle;
@@ -77,6 +83,7 @@
       st.phase += dt * p.speed;
       st.step += dt * 4.2 * p.walk;
       st.flutter += dt * p.maneSpeed;
+      st.pulse += dt * (1.3 + 1.7 * p.tuck);       // vague de lumière (Mythique) : plus rapide en vol
 
       // 1. Orientation voulue de chaque morceau de colonne.
       const abs = {};
@@ -183,6 +190,13 @@
       setBone("Whisker_R", 0.8 * m * Math.sin(f * 0.9 + 1) + drag, -m * Math.sin(f * 0.7 + 1.1) + dragY, 0, 0, 0);
       setBone("Beard", 0.5 * m * Math.sin(f * 0.8) + drag, 0.4 * m * Math.sin(f * 1.2), 0, 0, 0);
 
+      // Cristaux flottants (Mythique, os Crest1 à Crest8) : montent et descendent doucement, et se soulèvent
+      // un peu quand la vague de lumière passe. Les autres dragons n'ont pas ces os : rien ne se passe.
+      for (let c = 1; c <= PULSE_SEGMENTS; c++) {
+        setBone("Crest" + c, 0.06 * Math.sin(st.t * 1.3 + c * 0.9), 0, 0.05 * Math.sin(st.t * 1.1 + c * 1.7),
+          0.35 * Math.sin(st.t * 1.6 + c * 0.7) + 0.3 * pulseAt(c), 0);
+      }
+
       // Pattes : marche en diagonale ; en vol, repliées et elles suivent doucement la vague du corps.
       for (const leg in LEGS) {
         const off = LEGS[leg][0], s = LEGS[leg][1];
@@ -194,7 +208,7 @@
         setBone(leg + "_Foot", -0.35 * up * p.walk - 0.4 * p.tuck, 0, 0, 0, 0);
       }
     }
-    return { update: update, state: st };
+    return { update: update, state: st, pulseAt: pulseAt };
   }
   global.DragonAnimator = { create: create, MODES: MODES, BLINK_UP: BLINK_UP, BLINK_LOW: BLINK_LOW };
 })(window);

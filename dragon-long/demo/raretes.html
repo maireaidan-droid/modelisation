@@ -205,12 +205,14 @@ body {
                Eyes: "#7FF7FF", Pupils: "#1B1406", Mouth: "#8E2529", Tongue: "#C25A5A" },
       glow: { Fins: 0.8, Whiskers: 0.45, Horns: 0.15 }, sparkles: "rise" },
     { id: "mythique", rarity: "Mythique", color: "#ff4fd8", name: "Dragon du Néant", file: "dragon_v19_neant_rig.txt",
-      desc: "Né de la nuit entre les étoiles : cornes torsadées, crinière aux couleurs changeantes, poussière d'étoiles " +
-            "et la perle sacrée qu'il garde devant sa gueule.",
-      points: ["Forme unique : cornes en spirale", "Couleurs irisées qui changent", "Perle sacrée et poussière d'étoiles"],
+      desc: "Né de la nuit entre les étoiles : une vague de lumière court de ses cornes à sa queue, ses cristaux " +
+            "flottent au-dessus de son dos et sa queue se dissout en nébuleuse. Il garde la perle sacrée devant sa gueule.",
+      points: ["Pulsation : vague de lumière tête → queue", "Cristaux flottants, queue nébuleuse",
+               "Cornes en spirale, couleurs irisées", "Perle sacrée et poussière d'étoiles"],
       parts: { Body: "#1C1638", Belly: "#6A4BD8", Fins: "#FF4FD8", Horns: "#EDE6FF", Whiskers: "#8FF3FF",
-               Eyes: "#FFFFFF", Pupils: "#2A0A3A", Mouth: "#5A1650", Tongue: "#C04A9A" },
-      glow: { Fins: 0.9, Whiskers: 0.6, Horns: 0.25, Belly: 0.12 }, sparkles: "swirl", iris: true, pearl: true }
+               Eyes: "#FFFFFF", Pupils: "#2A0A3A", Mouth: "#5A1650", Tongue: "#C04A9A", Nebula: "#B98CFF" },
+      glow: { Fins: 0.9, Whiskers: 0.6, Horns: 0.25, Belly: 0.12, Nebula: 0.6 }, sparkles: "swirl", iris: true, pearl: true,
+      pulse: true }
   ];
 
   const stage = document.getElementById("stage");
@@ -275,10 +277,19 @@ body {
         const meshes = {}, bones = {}, rest = {};
         gltf.scene.traverse(function (o) {
           if (o.isMesh) {
-            const part = o.name.replace(/[_\d]+$/, "");
+            // Crest3, BellyGlow5… : même partie, on garde le numéro du tronçon pour la vague de lumière.
+            const seg = /^(Crest|BellyGlow)(\d+)/.exec(o.name);
+            const part = seg ? seg[1] : o.name.replace(/[_\d]+$/, "");
+            o.userData.seg = seg ? +seg[2] : 0;
             o.material = o.material.clone();
             o.material.flatShading = true;
-            if (part === "Fins" || part === "Whiskers") o.material.side = THREE.DoubleSide;
+            if (part === "Fins" || part === "Whiskers" || part === "Crest") o.material.side = THREE.DoubleSide;
+            if (part === "Nebula") {           // volutes translucides de la queue
+              o.material.transparent = true;
+              o.material.opacity = 0.55;
+              o.material.depthWrite = false;
+              o.material.side = THREE.DoubleSide;
+            }
             o.frustumCulled = false;
             (meshes[part] = meshes[part] || []).push(o);
           }
@@ -303,14 +314,17 @@ body {
     return entry.promise;
   }
 
+  // Parties découpées en tronçons (Mythique) : même couleur que la partie d'origine.
+  const PART_ALIAS = { Crest: "Fins", BellyGlow: "Belly" };
+
   function applyPalette(entry, r) {
     for (const part in entry.meshes) {
-      const hex = r.parts[part];
+      const hex = r.parts[part] || r.parts[PART_ALIAS[part]];
       if (!hex) continue;
       entry.meshes[part].forEach(function (o) {
         const m = o.material;
         m.color.set(hex).convertSRGBToLinear();
-        const g = part === "Eyes" ? 1.6 : (r.glow[part] || 0);
+        const g = part === "Eyes" ? 1.6 : (r.glow[part] || r.glow[PART_ALIAS[part]] || 0);
         m.emissive.set(hex).convertSRGBToLinear();
         m.emissiveIntensity = g;
       });
@@ -429,6 +443,28 @@ body {
     return irisCol.copy(IRIS[i]).lerp(IRIS[(i + 1) % n], k - i);
   }
 
+  // ---------- Pulsation (Mythique) : une vague de lumière part des cornes et court jusqu'à la queue ----------
+  // Elle allume tour à tour les tronçons de la crête (Crest1 à 8) et du ventre (BellyGlow1 à 8).
+  const pulseWhite = new THREE.Color(0xffffff), pulseLilac = new THREE.Color(0xc9a2ff).convertSRGBToLinear();
+  function updatePulse(entry, r) {
+    const anim = entry.anim;
+    (entry.meshes.Crest || []).forEach(function (o) {
+      const k = anim.pulseAt(o.userData.seg);
+      o.material.color.lerp(pulseWhite, 0.55 * k);           // au passage de la vague, le cristal blanchit…
+      o.material.emissiveIntensity = 0.25 + 2.2 * k;         // … et s'allume
+    });
+    (entry.meshes.BellyGlow || []).forEach(function (o) {
+      const k = anim.pulseAt(o.userData.seg);
+      o.material.emissive.copy(pulseLilac);
+      o.material.emissiveIntensity = r.glow.Belly + 1.1 * k;
+    });
+    (entry.meshes.Horns || []).forEach(function (o) { o.material.emissiveIntensity = r.glow.Horns + 1.2 * anim.pulseAt(0); });
+    (entry.meshes.Nebula || []).forEach(function (o) {
+      o.material.emissiveIntensity = r.glow.Nebula * (0.7 + 0.8 * anim.pulseAt(PULSE_TAIL));
+    });
+  }
+  const PULSE_TAIL = 7;   // la nébuleuse s'illumine juste après le dernier tronçon de crête
+
   // ---------- Interface ----------
   const cards = document.getElementById("cards");
   RARITIES.forEach(function (r) {
@@ -514,10 +550,13 @@ body {
       if (pearl.visible) updatePearl(clock.elapsedTime, currentEntry);
       if (current && current.iris && !reduceMotion) {
         const t = clock.elapsedTime * 0.25;
-        (currentEntry.meshes.Fins || []).forEach(function (o) { o.material.color.copy(irisAt(t)); o.material.emissive.copy(irisCol); });
+        (currentEntry.meshes.Fins || []).concat(currentEntry.meshes.Crest || []).forEach(function (o) {
+          o.material.color.copy(irisAt(t)); o.material.emissive.copy(irisCol);
+        });
         (currentEntry.meshes.Whiskers || []).forEach(function (o) { o.material.color.copy(irisAt(t + 1.2)); o.material.emissive.copy(irisCol); });
       }
     }
+    if (currentEntry && current && current.pulse && !reduceMotion) updatePulse(currentEntry, current);
     controls.update();
     renderer.render(scene, camera);
     requestAnimationFrame(loop);

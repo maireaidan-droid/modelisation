@@ -1,5 +1,5 @@
 --[[
-Dragon Long v19 : réglages automatiques après l'import dans Roblox Studio.
+Dragon Long v19 : réglages automatiques après l'import dans Roblox Studio (forme de base ou Mythique « neant »).
 
 Utilisation :
   1. Importer Dragon_Long_v19_rig.glb (version animable, avec squelette) ou Dragon_Long_v19.glb (statique)
@@ -32,6 +32,13 @@ local PARTS = {
 	Mouth    = { color = "#8E2529", material = Enum.Material.SmoothPlastic, shadow = false },
 	Tongue   = { color = "#B9434C", material = Enum.Material.SmoothPlastic, shadow = false },
 }
+-- Mythique (Dragon_Long_v19_neant_rig) : crête et ventre découpés en tronçons numérotés (Crest1…, BellyGlow1…)
+-- pour la vague de lumière, et queue en nébuleuse. On garde leurs noms tels quels (DragonAnimator s'en sert).
+local SEGMENTS = {
+	Crest     = { like = "Fins", material = Enum.Material.Neon },
+	BellyGlow = { like = "Belly" },
+}
+local NEBULA = { color = "#B98CFF", material = Enum.Material.Neon, transparency = 0.45 }
 local EXPECTED_LENGTH = 58 -- studs, environ
 
 -- 1. Trouver le modèle
@@ -55,19 +62,36 @@ ChangeHistoryService:SetWaypoint("Avant réglage Dragon Long")
 local found, body, eyes = {}, nil, {}
 for _, part in ipairs(model:GetDescendants()) do
 	if part:IsA("BasePart") then
-		for name, cfg in pairs(PARTS) do
-			if part.Name == name or string.find(part.Name, name, 1, true) then
-				part.Name = name
-				part.Color = Color3.fromHex(cfg.color)
-				part.Material = cfg.material
-				part.CastShadow = cfg.shadow
-				if cfg.doubleSided then
-					pcall(function() part.DoubleSided = true end) -- pas modifiable partout : on ignore si refusé
+		local kind, num = string.match(part.Name, "^(%a+)(%d+)") -- « Crest3 » ou « Crest3_Mesh » si Studio l'a renommée
+		local seg = SEGMENTS[kind or ""]
+		if seg then
+			local cfg = PARTS[seg.like]
+			part.Name = kind .. num
+			part.Color = Color3.fromHex(cfg.color)
+			part.Material = seg.material or cfg.material
+			part.CastShadow = cfg.shadow
+			found[seg.like] = found[seg.like] or 0
+		elseif string.sub(part.Name, 1, 6) == "Nebula" then
+			part.Name = "Nebula"
+			part.Color = Color3.fromHex(NEBULA.color)
+			part.Material = NEBULA.material
+			part.Transparency = NEBULA.transparency
+			part.CastShadow = false
+		else
+			for name, cfg in pairs(PARTS) do
+				if part.Name == name or string.find(part.Name, name, 1, true) then
+					part.Name = name
+					part.Color = Color3.fromHex(cfg.color)
+					part.Material = cfg.material
+					part.CastShadow = cfg.shadow
+					if cfg.doubleSided then
+						pcall(function() part.DoubleSided = true end) -- pas modifiable partout : on ignore si refusé
+					end
+					found[name] = (found[name] or 0) + 1
+					if name == "Body" then body = part end
+					if name == "Eyes" then table.insert(eyes, part) end
+					break
 				end
-				found[name] = (found[name] or 0) + 1
-				if name == "Body" then body = part end
-				if name == "Eyes" then table.insert(eyes, part) end
-				break
 			end
 		end
 		part.Anchored = true

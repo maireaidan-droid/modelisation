@@ -1,5 +1,5 @@
 --[[
-DragonAnimator : anime le Dragon Long (modèle avec squelette Dragon_Long_v18_rig).
+DragonAnimator : anime le Dragon Long (modèle avec squelette Dragon_Long_v19_rig).
 
 À placer dans : StarterPlayer > StarterPlayerScripts (LocalScript).
 L'animation tourne chez chaque joueur (les os ne se répliquent pas depuis le serveur), c'est normal.
@@ -17,7 +17,10 @@ Ce qui est animé :
   - yeux : la pupille glisse sur l'œil par petits sauts rapides (le regard), la tête suit ; clignements avec de vraies paupières (haut et bas) qui glissent sur l'œil :
     fermeture rapide, réouverture plus lente avec un petit rebond, parfois double, parfois lent au repos ;
   - crinière, moustaches, barbichette : flottent, plus fort en vol ;
-  - pattes : marche en diagonale, repliées vers l'arrière en vol.
+  - pattes : marche en diagonale, repliées vers l'arrière en vol ;
+  - Mythique (Dragon_Long_v19_neant_rig) : les cristaux flottants (os Crest1 à Crest8) montent et descendent,
+    et une vague de lumière court des cornes à la queue (parties Crest1…, BellyGlow1…, Horns, Nebula).
+    Les autres dragons n'ont pas ces os ni ces parties : rien ne se passe pour eux.
 ]]
 
 local RunService = game:GetService("RunService")
@@ -34,6 +37,9 @@ local GAZE_FWD, GAZE_BACK, GAZE_Y = 0.15, 0.34, 0.07
 local PUPIL_FWD_L, PUPIL_FWD_R = -1, 1 -- sens « vers l'avant » de l'axe X de chaque pupille
 local SEG = 0.8         -- longueur du corps par pas de colonne (studs)
 local KAPPA = 0.11      -- nombre d'onde : ~1,3 vague sur toute la longueur du corps
+local PULSE_SEGMENTS, PULSE_STEP = 8, 0.6 -- Mythique : tronçons de la vague de lumière, décalage entre deux
+local PULSE_TAIL = 7    -- la nébuleuse s'illumine juste après le dernier tronçon de crête
+local WHITE, LILAC = Color3.new(1, 1, 1), Color3.fromHex("#C9A2FF")
 
 -- up / side : amplitude de la vague verticale / latérale (rad) ; speed : vitesse de la vague (rad/s) ;
 -- helix : décalage entre les deux (pi/2 = chaque anneau décrit un cercle, le corps s'enroule en spirale) ;
@@ -78,14 +84,34 @@ local function collectBones(model)
 	return bones
 end
 
+-- Parties qui s'allument au passage de la vague (Mythique) : { part, tronçon, couleur de repos, couleur au pic, force }.
+local function collectGlow(model)
+	local list = {}
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			local kind, n = string.match(d.Name, "^(%a+)(%d+)$")
+			if kind == "Crest" then
+				table.insert(list, { d, tonumber(n), d.Color, WHITE, 0.55 })
+			elseif kind == "BellyGlow" then
+				table.insert(list, { d, tonumber(n), d.Color, LILAC, 0.7 })
+			elseif d.Name == "Horns" then
+				table.insert(list, { d, 0, d.Color, WHITE, 0.4 })
+			elseif d.Name == "Nebula" then
+				table.insert(list, { d, PULSE_TAIL, d.Color, WHITE, 0.45 })
+			end
+		end
+	end
+	return list
+end
+
 local function newState(model)
 	local p = {}
 	for k, v in pairs(MODES.Idle) do
 		p[k] = v
 	end
 	return {
-		model = model, bones = collectBones(model), p = p,
-		phase = rng:NextNumber(0, 6), step = 0, flutter = 0, t = 0,
+		model = model, bones = collectBones(model), glow = collectGlow(model), p = p,
+		phase = rng:NextNumber(0, 6), step = 0, flutter = 0, pulse = 0, t = 0,
 		blinkIn = rng:NextNumber(1, 4), blink = nil,
 		headLook = 0, headTarget = 0,
 		gazeX = 0, gazeY = 0, gazeTx = 0, gazeTy = 0, gazeIn = 1, microX = 0, microY = 0, microIn = 0.5,
@@ -110,6 +136,11 @@ local function bodyAngles(st, s)
 	local env = 0.8 + 0.3 * s / 70
 	local a = KAPPA * s - st.phase
 	return p.up * env * math.sin(a), p.side * env * math.sin(a + p.helix)
+end
+
+-- Vague de lumière : 0 (éteint) à 1 (pic) pour le tronçon c (0 = cornes, 1 à 8 de la tête vers la queue).
+local function pulseAt(st, c)
+	return math.max(0, math.sin(st.pulse - PULSE_STEP * c)) ^ 6
 end
 
 -- Fermeture des paupières (0 = ouvert, 1 = fermé) à l'instant tt d'un clignement b.
@@ -153,6 +184,7 @@ local function update(st, dt)
 	st.phase += dt * p.speed
 	st.step += dt * 4.2 * p.walk
 	st.flutter += dt * p.maneSpeed
+	st.pulse += dt * (1.3 + 1.7 * p.tuck) -- vague de lumière (Mythique) : plus rapide en vol
 
 	-- 1. Orientation voulue de chaque morceau de colonne.
 	local ax, ay = {}, {}
@@ -268,6 +300,16 @@ local function update(st, dt)
 	setBone(st, "Whisker_R", 0.8 * m * math.sin(f * 0.9 + 1) + drag, -m * math.sin(f * 0.7 + 1.1) + dragY, 0)
 	setBone(st, "Beard", 0.5 * m * math.sin(f * 0.8) + drag, 0.4 * m * math.sin(f * 1.2), 0)
 
+	-- Cristaux flottants (Mythique) : montent et descendent doucement, et se soulèvent un peu quand la vague passe.
+	for c = 1, PULSE_SEGMENTS do
+		setBone(st, "Crest" .. c, 0.06 * math.sin(st.t * 1.3 + c * 0.9), 0, 0.05 * math.sin(st.t * 1.1 + c * 1.7),
+			0.35 * math.sin(st.t * 1.6 + c * 0.7) + 0.3 * pulseAt(st, c), 0)
+	end
+	-- Vague de lumière : chaque partie passe de sa couleur de repos à une couleur claire (en Neon, elle brille).
+	for _, gl in ipairs(st.glow) do
+		gl[1].Color = gl[3]:Lerp(gl[4], gl[5] * pulseAt(st, gl[2]))
+	end
+
 	-- Pattes : marche en diagonale ; en vol, repliées et elles suivent doucement la vague du corps.
 	for leg, info in pairs(LEGS) do
 		local ph = st.step + info[1]
@@ -286,6 +328,8 @@ local function track(model)
 		model.DescendantAdded:Connect(function(d)
 			if d:IsA("Bone") and dragons[model] then
 				dragons[model].bones = collectBones(model)
+			elseif d:IsA("BasePart") and dragons[model] then
+				dragons[model].glow = collectGlow(model)
 			end
 		end)
 	end

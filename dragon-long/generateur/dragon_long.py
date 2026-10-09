@@ -97,7 +97,7 @@ def build_body(a, pts, T, N, B, radii):
 def surface(pts, T, N, B, radii, x, ang, k=1.0):
     """Point sur la peau du corps à l'anneau x (décimal) et à l'angle ang (pi/2 = dessus, 3pi/2 = ventre).
     Renvoie le point, la normale vers l'extérieur, la tangente (vers la queue) et le rayon."""
-    i = int(np.clip(np.floor(x), 0, RINGS - 2))
+    i = int(np.clip(np.floor(x), 0, len(pts) - 2))
     w = x - i
     p = pts[i] * (1 - w) + pts[i + 1] * w
     t = normalize(T[i] * (1 - w) + T[i + 1] * w)
@@ -113,7 +113,7 @@ def build_scales(a, pts, T, N, B, radii):
     # bord avant enfoncé sous l'écaille précédente, bord arrière (vers la queue) à peine soulevé.
     step = 2 * np.pi / 10
     spacing = np.linalg.norm(pts[1] - pts[0])
-    for row in range(3, RINGS - 4):
+    for row in range(3, len(pts) - 4):
         offs = [j * step for j in range(-3, 4)] if row % 2 == 0 else [(j + 0.5) * step for j in range(-3, 3)]
         for d in offs:
             c, o, t, r = surface(pts, T, N, B, radii, row + 0.5, np.pi / 2 + d, 0.97)
@@ -132,7 +132,8 @@ def build_scales(a, pts, T, N, B, radii):
 def build_belly_plates(a, pts, T, N, B, radii):
     # Plaques du ventre en bandes, comme sur la référence : bord avant bombé, qui redescend vers l'arrière.
     angs = np.linspace(9 * np.pi / 8 + 0.08, 15 * np.pi / 8 - 0.08, 5)
-    for i in range(1, RINGS - 3):
+    pulse = getattr(a, "style", {}).get("pulse")
+    for i in range(1, len(pts) - 3):
         sections = []
         for sfrac, lift in ((0.06, 0.03), (0.35, 0.17), (0.94, 0.0)):
             outer = []
@@ -141,13 +142,84 @@ def build_belly_plates(a, pts, T, N, B, radii):
                 outer.append(p + o * lift * (0.5 + 0.5 * r / 1.85))
             inner = [surface(pts, T, N, B, radii, i + sfrac, ang, 0.82)[0] for ang in (angs[-1], angs[0])]
             sections.append(np.array(outer + inner))
-        a.add("Belly", *loft(sections))
+        a.add(seg_part(a, "BellyGlow", i, "#E2B65C") if pulse else "Belly", *loft(sections))
 
 
 def crystal(a, base, d, L, r, part="Fins"):
     """Cristal hexagonal pointu, planté un peu dans la peau."""
     d = normalize(d)
     a.add(part, *tube([base - d * r * 0.6, base + d * L * 0.72, base + d * L], [r * 0.9, r, 0.0], 6))
+
+
+PULSE_SEGMENTS = 8
+
+
+def seg_index(i):
+    """Tronçon (1 à 8) de la colonne pour l'anneau i : sert à la vague de lumière et aux cristaux flottants."""
+    return int(np.clip((i - 4) / (RINGS - 8) * PULSE_SEGMENTS, 0, PULSE_SEGMENTS - 1)) + 1
+
+
+def seg_part(a, prefix, i, color, material="SmoothPlastic"):
+    name = prefix + str(seg_index(i))
+    a.part(name, color, material)
+    return name
+
+
+def build_floating_crest(a, pts, T, N, B, radii):
+    # Mythique : les cristaux de la crête flottent au-dessus du dos, en 8 tronçons qui ont chacun leur os
+    # (ils montent et descendent doucement, et la vague de lumière les allume l'un après l'autre).
+    sizes = (1.0, 0.7, 0.85, 0.65)
+    gap = 1.1
+    centers = {}
+    end = getattr(a, "crest_end", RINGS - 6)          # la crête s'arrête là où la queue devient nébuleuse
+    for j, i in enumerate(range(5, end, 3)):
+        r = radii[min(i, len(radii) - 1)]
+        base = pts[i] + N[i] * (r * 0.8 + gap)
+        lean = B[i] * (0.18 if j % 2 else -0.18)
+        L = (1.7 + 0.9 * r) * sizes[j % 4]
+        k = seg_index(i)
+        centers.setdefault(k, []).append((i, base))
+        a.gid = a.new_group("bone", bone="Crest%d" % k)
+        part = seg_part(a, "Crest", i, "#C8432F")
+        crystal(a, base, N[i] + T[i] * 0.45 + lean, L, 0.26 + 0.12 * r, part)
+        if j % 2 == 0:
+            crystal(a, base + B[i] * 0.3 * r + T[i] * 0.3, N[i] + T[i] * 0.3 - lean * 2.5, L * 0.6, 0.16 + 0.07 * r, part)
+        # Petit éclat qui flotte sous le cristal, entre lui et le dos.
+        crystal(a, pts[i] + N[i] * (r * 0.8 + gap * 0.45), N[i] + T[i] * 0.2 - lean, 0.35 + 0.15 * r, 0.08 + 0.04 * r, part)
+        a.gid = 0
+    for k, items in centers.items():
+        i0 = items[len(items) // 2][0]
+        parent = min(SPINE_BONES, key=lambda b: abs(b[0] - i0))[1]
+        a.bone("Crest%d" % k, np.mean([b for _, b in items], axis=0), parent)
+
+
+def build_nebula_tail(a, pts, T, N, B, radii, start):
+    # Mythique : le dernier tiers de la queue se dissout en volutes de nébuleuse translucides et lumineuses,
+    # qui s'enroulent autour de la ligne de la queue (elles suivent les os de la colonne, donc ondulent avec elle).
+    a.part("Nebula", "#B98CFF", "Neon")
+    n = len(pts)
+    # 4 rubans larges qui tournent lentement autour de la queue (peu de tours : pas d'effet de cage).
+    for w in range(4):
+        ph = w * np.pi / 2
+        line, rad = [], []
+        for i in range(start - 3, n):
+            q = (i - (start - 3)) / (n - 1 - (start - 3))
+            ang = ph + q * 3.2
+            rr = radii[min(i, n - 1)] * (0.9 - 0.3 * q) + 0.9 * q
+            line.append(pts[i] + (B[i] * np.cos(ang) + N[i] * np.sin(ang)) * rr * (0.4 + 0.6 * np.sin(q * np.pi * 0.9)))
+            rad.append((0.62 - 0.45 * q) * (0.8 + 0.2 * np.sin(w * 1.7 + q * 7)))
+        rad[-1] = 0.0
+        a.add("Nebula", *tube(catmull_rom(line, 26), np.interp(np.linspace(0, 1, 26), np.linspace(0, 1, len(rad)), rad),
+                              5, flat=0.6, up=N[start]))
+    # Nuages : serrés et gros près du corps, de plus en plus petits et dispersés vers le bout.
+    rng = np.random.default_rng(7)
+    for _ in range(34):
+        q = rng.uniform(0, 1) ** 0.8
+        i = int(start + q * (n - 1 - start))
+        d = normalize(B[i] * rng.normal() + N[i] * rng.normal())
+        c = pts[i] + d * (radii[min(i, n - 1)] * 0.6 + q * 2.2) * rng.uniform(0.5, 1.2) + T[i] * rng.normal() * 0.5
+        s = rng.uniform(0.35, 0.8) * (1.1 - 0.7 * q)
+        a.add("Nebula", *blob(c, T[i], N[i], B[i], s * 1.3, s * 0.8, s, 6, 3))
 
 
 def build_crystal_crest(a, pts, T, N, B, radii):
@@ -174,6 +246,8 @@ def build_crystal_crest(a, pts, T, N, B, radii):
 
 
 def build_spines(a, pts, T, N, B, radii):
+    if getattr(a, "style", {}).get("crest") == "cristaux_flottants":
+        return build_floating_crest(a, pts, T, N, B, radii)
     if getattr(a, "style", {}).get("crest") == "cristaux":
         return build_crystal_crest(a, pts, T, N, B, radii)
     # Crête du dos : mèches de flammes qui se suivent, couchées vers la queue, grandes / petites en alternance,
@@ -1072,7 +1146,7 @@ VARIANTS = {
     "": {},                                                   # forme de base : bois de cerf, crête en flammes
     "glace": {"horns": "couronne", "crest": "cristaux"},      # Épique
     "celeste": {"horns": "grands_bois", "crest": "cristaux"},  # Légendaire
-    "neant": {"horns": "spirale", "crest": "cristaux"},       # Mythique
+    "neant": {"horns": "spirale", "crest": "cristaux_flottants", "tail": "nebuleuse", "pulse": True},  # Mythique
 }
 
 
@@ -1094,10 +1168,22 @@ def build(variant=""):
     for i, nm in SPINE_BONES[4:]:
         a.bone(nm, pts[i], prev)
         prev = nm
-    build_body(a, pts, T, N, B, radii)
-    build_scales(a, pts, T, N, B, radii)
-    build_belly_plates(a, pts, T, N, B, radii)
-    build_spines(a, pts, T, N, B, radii)
+    if a.style.get("tail") == "nebuleuse":
+        # Le corps solide s'arrête aux deux tiers et se referme en pointe ; la suite est faite de nébuleuse.
+        K = 52
+        r2 = radii.copy()
+        r2[K - 8:K] *= np.linspace(1.0, 0.25, 8)
+        build_body(a, pts[:K], T[:K], N[:K], B[:K], r2[:K])
+        build_scales(a, pts[:K - 4], T[:K - 4], N[:K - 4], B[:K - 4], r2[:K - 4])
+        build_belly_plates(a, pts[:K - 2], T[:K - 2], N[:K - 2], B[:K - 2], r2[:K - 2])
+        a.crest_end = K - 3
+        build_spines(a, pts, T, N, B, r2)
+        build_nebula_tail(a, pts, T, N, B, radii, K - 6)
+    else:
+        build_body(a, pts, T, N, B, radii)
+        build_scales(a, pts, T, N, B, radii)
+        build_belly_plates(a, pts, T, N, B, radii)
+        build_spines(a, pts, T, N, B, radii)
     build_legs(a, pts, T, N, B, radii)
     build_head(a, pts[0], radii[0])
     return a
