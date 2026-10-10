@@ -10,16 +10,18 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "dragon-long", "generateur"))
 from meshlib import Asset, catmull_rom, frames, loft, ellipse_ring, tube, blob, fin, gem, normalize  # noqa: E402
 
-VERSION = "v1"
+VERSION = "v3"
 X, Y, Z = np.eye(3)
 rng = np.random.default_rng(21)
 
 # Couleurs (sRGB, comme dans Roblox) et matériaux de chaque partie.
 PARTS = [
-    ("Body", "#1F2C52", "SmoothPlastic"),      # écailles bleu nuit
+    ("Body", "#1F2C52", "SmoothPlastic"),      # peau bleu nuit
+    ("Scales", "#2A3D72", "SmoothPlastic"),    # écailles en tuiles, un ton plus clair
     ("Belly", "#3B4F86", "SmoothPlastic"),     # plaques du ventre
     ("Plates", "#2E3C68", "SmoothPlastic"),    # plaques blindées du dos, arcades
-    ("Membrane", "#25366A", "SmoothPlastic"),  # membranes des ailes
+    ("Membrane", "#2A3E7A", "SmoothPlastic"),  # membranes des ailes
+    ("Membrane2", "#16204A", "SmoothPlastic"), # bords sombres de la membrane, le long des doigts
     ("Horns", "#C9D6F0", "SmoothPlastic"),     # cornes, griffes, dents, os des ailes
     ("Bolt", "#6FF2FF", "Neon"),               # éclairs cyan
     ("Bolt2", "#FFF27A", "Neon"),              # éclairs jaunes (cornes, dard)
@@ -56,16 +58,20 @@ def zigzag(a, part, p0, p1, r0, r1, n=5, amp=0.25, normal=None):
     return pts
 
 
-def double_sided(a, part, verts, faces, normals, thick=0.12):
+def double_sided(a, part, verts, faces, normals, thick=0.12, labels=None):
     """Surface fine (membrane) : deux faces décalées de l'épaisseur, tournées vers l'extérieur, pour qu'elle se
-    voie de partout sans que les deux couches se chevauchent."""
-    p = a.parts[part]
+    voie de partout sans que les deux couches se chevauchent. labels : partie de chaque face (sinon part)."""
     verts = np.asarray(verts)
-    for sgn, f in ((1, faces), (-1, faces[:, ::-1])):
-        base = len(p["v"])
-        p["v"].extend((verts + normals * thick * 0.5 * sgn).tolist())
-        p["f"].extend((np.asarray(f) + base).tolist())
-        p["g"].extend([a.gid] * len(verts))
+    faces = np.asarray(faces)
+    labels = np.array(labels if labels is not None else [part] * len(faces))
+    for name in np.unique(labels):
+        p = a.parts[name]
+        sel = faces[labels == name]
+        for sgn, f in ((1, sel), (-1, sel[:, ::-1])):
+            base = len(p["v"])
+            p["v"].extend((verts + normals * thick * 0.5 * sgn).tolist())
+            p["f"].extend((f + base).tolist())
+            p["g"].extend([a.gid] * len(verts))
 
 
 def scale_since(a, mark, center, k):
@@ -110,7 +116,70 @@ def build_body(a):
         labels.append("Belly" if k in {5, 6} else "Body")
     a.add_split(verts, faces, labels)
     a.spine = (pts, T, N, B, rr)
+    global SPINE_DATA
+    SPINE_DATA = (pts, T, N, B, rr)
     return pts, T, N, B, rr
+
+
+def surface(x, ang, k=1.0):
+    """Point de la peau du corps à l'anneau x (décimal) et à l'angle ang (pi/2 = dos, 3pi/2 = ventre) :
+    point, normale vers l'extérieur, tangente (vers la tête), rayon. Même forme que les anneaux de build_body."""
+    pts, T, N, B, rr = SPINE_DATA
+    i = int(np.clip(np.floor(x), 0, len(pts) - 2))
+    w = x - i
+    p = pts[i] * (1 - w) + pts[i + 1] * w
+    t = normalize(T[i] * (1 - w) + T[i + 1] * w)
+    n = normalize(N[i] * (1 - w) + N[i + 1] * w)
+    b = normalize(B[i] * (1 - w) + B[i + 1] * w)
+    r = rr[i] * (1 - w) + rr[i + 1] * w
+    ky = 0.95 if np.sin(ang) > 0 else 0.82
+    q = p + (b * np.cos(ang) * 1.08 + n * np.sin(ang) * ky) * r * k
+    o = normalize(b * np.cos(ang) * ky + n * np.sin(ang) * 1.08)
+    return q, o, t, r
+
+
+def build_scales(a, pts, rr):
+    """Écailles en tuiles sur le dos et les flancs, en quinconce : bouclier à 5 côtés, pointe tournée vers la
+    queue, bord avant enfoncé sous l'écaille précédente. Elles grossissent avec le corps et s'affinent sur
+    la queue et le cou ; deux tons qui alternent par rangée."""
+    n = len(pts)
+    spacing = np.linalg.norm(pts[1] - pts[0])
+    for row in range(4, n - 5):
+        r = rr[row]
+        cols = int(np.clip(round(r * 3.2), 5, 15))          # plus de colonnes là où le corps est épais
+        step = 3.6 / cols                                  # couvre ±1,8 rad autour du dos (jusqu'au ventre)
+        offs = [(j - (cols - 1) / 2 + (0.5 if row % 2 else 0)) * step for j in range(cols)]
+        part = "Scales" if (row // 2) % 2 else "Body"
+        for d in offs:
+            if abs(d) > 1.85:
+                continue
+            c, o, t, r = surface(row + 0.5, np.pi / 2 + d, 0.98)
+            t = -t                                         # vers la queue
+            x = normalize(np.cross(o, t))
+            L, W = spacing * 1.8, r * step * 1.2
+            base = []
+            for k in range(5):
+                ang = 2 * np.pi * k / 5                    # k = 0 : pointe arrière
+                ca, sa = np.cos(ang), np.sin(ang)
+                lift = (0.04 + 0.03 * r) * max(0.0, ca) - (0.06 + 0.04 * r) * max(0.0, -ca)
+                base.append(c + t * ca * L * (0.6 if ca > 0 else 0.45) + x * sa * W / 2 + o * lift)
+            apex = c + t * L * 0.15 + o * (0.06 + 0.04 * r)
+            a.add(part, base + [apex], [(k, (k + 1) % 5, 5) for k in range(5)] + [(0, 2, 1), (0, 3, 2), (0, 4, 3)])
+
+
+def build_belly_plates(a, pts, rr):
+    """Plaques du ventre en bandes transversales, bord avant bombé qui redescend vers l'arrière."""
+    angs = np.linspace(3 * np.pi / 2 - 0.62, 3 * np.pi / 2 + 0.62, 6)
+    for i in range(6, len(pts) - 8, 2):
+        sections = []
+        for sfrac, lift in ((0.0, 0.03), (0.6, 0.2), (1.85, 0.0)):
+            outer = []
+            for ang in angs:
+                q, o, t, r = surface(i + sfrac, ang, 1.0)
+                outer.append(q + o * lift * (0.5 + 0.25 * r))
+            inner = [surface(i + sfrac, ang, 0.85)[0] for ang in (angs[-1], angs[0])]
+            sections.append(np.array(outer + inner))
+        a.add("Belly", *loft(sections))
 
 
 def build_back(a, pts, T, N, B, rr):
@@ -122,14 +191,14 @@ def build_back(a, pts, T, N, B, rr):
     for i in range(12, n - 12, 4):
         p, t, nn, r = pts[i + 2], T[i + 2], N[i + 2], rr[i + 2]
         h = 1.2 + 1.1 * r
-        base = p + nn * r * 0.95
+        base = p + nn * r * 1.05
         zigzag(a, "Bolt", base, base + nn * h - t * h * 0.55, 0.32, 0.06, n=3, amp=0.35, normal=B[i])
     # Rayures : éclairs posés à plat sur les flancs
     for i in range(22, n - 26, 9):
         for sd in (1, -1):
             r0, r1 = rr[i], rr[i + 6]
-            q0 = pts[i] + B[i] * sd * r0 * 1.04 + N[i] * r0 * 0.25
-            q1 = pts[i + 6] + B[i + 6] * sd * r1 * 1.0 - N[i + 6] * r1 * 0.45
+            q0 = surface(i, np.pi / 2 - sd * 1.25, 1.12)[0]
+            q1 = surface(i + 6, np.pi / 2 - sd * 1.75, 1.12)[0]
             zigzag(a, "Bolt", q0, q1, 0.16, 0.1, n=4, amp=0.22, normal=B[i] * sd)
 
 
@@ -147,11 +216,11 @@ def build_tail(a, pts, T, N, B, rr):
 
 
 # ---------------------------------------------------------------- tête
-def build_head(a):
+def build_head(a, base, f):
     """Tête en coin, allongée : crâne plat, museau en lance, mâchoire légèrement ouverte, crocs, arcades,
-    grande corne frontale, deux cornes vers l'arrière et des cornes-éclairs fourchues."""
-    base = SPINE[-1][0]
-    f = normalize(V(0, -0.12, 1))              # la tête regarde devant, un peu vers le bas
+    grande corne frontale, deux cornes vers l'arrière et des cornes-éclairs fourchues.
+    base : base du crâne (bout du cou), f : direction du regard."""
+    f = normalize(f)
     u = normalize(Y - f * (Y @ f))
     s = np.cross(u, f)
     c = base + f * 1.2
@@ -215,6 +284,43 @@ def build_head(a):
     a.add("Bolt", *blob(c + f * 1.8 - u * 0.9, f, u, s, 1.4, 0.35, 0.9, 8, 3))
 
 
+# Hydre : deux cous de plus, qui partent du poitrail de chaque côté du cou principal et s'écartent.
+SIDE_NECKS = [
+    # (points du cou, du poitrail vers la tête), direction du regard
+    ([V(2.4, 18.5, 6.0), V(6.5, 20.0, 8.5), V(11.0, 22.0, 10.0), V(14.5, 24.0, 12.0)], V(0.5, -0.12, 1)),
+]
+SIDE_NECKS.append(([p * V(-1, 1, 1) for p in SIDE_NECKS[0][0]], SIDE_NECKS[0][1] * V(-1, 1, 1)))
+
+
+def build_side_neck(a, ctrl):
+    """Cou d'une tête d'hydre : écailles en tuiles sur le dessus, plaques de ventre dessous, crête d'éclairs."""
+    pts = catmull_rom(ctrl, 40)
+    rr = np.interp(np.linspace(0, 1, len(pts)), [0, 0.3, 1], [3.0, 2.3, 1.9])
+    T, N, B = frames(pts, Y)
+    rings = [np.array([p + (b * np.cos(x) * 1.05 + n * np.sin(x) * 0.95) * r
+                       for x in np.pi / 2 + np.arange(10) * 2 * np.pi / 10]) for p, n, b, r in zip(pts, N, B, rr)]
+    v, f = loft(rings)
+    a.add("Body", v, f)
+    for i in range(3, len(pts) - 2):
+        t, n, b, r = T[i], N[i], B[i], rr[i]
+        # écailles sur le dessus et les côtés
+        for d in np.linspace(-1.6, 1.6, 7) + (0.23 if i % 2 else 0):
+            o = normalize(n * np.sin(np.pi / 2 + d) + b * np.cos(np.pi / 2 + d))
+            c = pts[i] + o * r * 0.99
+            x = normalize(np.cross(o, -t))
+            L, W = 1.5, r * 0.55
+            base = [c - t * np.cos(2 * np.pi * k / 5) * L * 0.55 + x * np.sin(2 * np.pi * k / 5) * W / 2
+                    - o * 0.06 * (np.cos(2 * np.pi * k / 5) < 0) for k in range(5)]
+            a.add("Scales" if (i // 2) % 2 else "Body", base + [c + o * 0.12],
+                  [(k, (k + 1) % 5, 5) for k in range(5)] + [(0, 2, 1), (0, 3, 2), (0, 4, 3)])
+        if i % 2 == 0:                                       # plaques de ventre
+            a.add("Belly", *gem(pts[i] - n * r * 0.85, t, n, b, 0.9, 0.3, r * 0.75))
+        if i % 4 == 1:                                       # crête d'éclairs
+            q = pts[i] + n * r * 1.05
+            zigzag(a, "Bolt", q, q + n * 2.2 - t * 1.3, 0.26, 0.05, n=3, amp=0.35, normal=b)
+    return pts[-1]
+
+
 # ---------------------------------------------------------------- pattes
 def build_legs(a):
     """Pattes arrière puissantes, digitigrades : cuisse, jambe, métatarse, 3 doigts griffus devant + 1 derrière."""
@@ -241,73 +347,109 @@ def build_legs(a):
 SPAN = 40.0
 
 
+def at(curve, u):
+    """Point à la fraction u (0 à 1) d'une courbe échantillonnée."""
+    x = u * (len(curve) - 1)
+    k = int(min(np.floor(x), len(curve) - 2))
+    w = x - k
+    return curve[k] * (1 - w) + curve[k + 1] * w
+
+
+def finger(a, wr, tip, sd, r0):
+    """Doigt d'aile : trois phalanges qui s'affinent, articulations renflées, griffe crochue au bout."""
+    mid = (wr + tip) / 2 + V(sd * 0.6, 1.2, 0)
+    pts = catmull_rom([wr, mid, tip], 24)
+    rad = np.interp(np.linspace(0, 1, len(pts)), [0, 0.33, 0.66, 1], [r0, r0 * 0.72, r0 * 0.5, r0 * 0.28])
+    a.add("Horns", *tube(pts, rad, 6, tip=False))
+    for u in (0.33, 0.66):                                   # articulations
+        q = at(pts, u)
+        a.add("Horns", *blob(q, normalize(at(pts, u + 0.02) - q), Y, X, r0 * 0.7, r0 * 0.75, r0 * 0.75, 6, 3))
+    d = normalize(pts[-1] - pts[-3])
+    hook = normalize(d - Y * 0.8)
+    a.add("Horns", *gem(pts[-1] + hook * 0.6, hook, Y if abs(hook @ Y) < 0.9 else Z, X, 0.9, 0.18, 0.2))
+    return pts
+
+
 def build_wings(a):
-    """Ailes de chauve-souris immenses : bras (épaule, coude, poignet), pouce griffu, 4 doigts ; membrane qui se
-    creuse entre les doigts ; bord d'attaque lumineux et nervures en éclairs ramifiés."""
+    """Ailes de chauve-souris immenses :
+    - bras épais (épaule, coude, poignet) avec plaques et épines, pouce griffu ;
+    - 4 doigts à phalanges, articulations et griffes ;
+    - membrane avant (du cou au poignet), membrane entre les doigts au bord festonné, membrane du flanc ;
+    - membrane en deux tons (plus sombre le long des os), bord d'attaque lumineux, nervures en éclairs."""
     for sd in (1, -1):
         sh = V(sd * 3.4, 22.0, 3.0)
         el = sh + V(sd * SPAN * 0.32, SPAN * 0.30, -SPAN * 0.06)
         wr = el + V(sd * SPAN * 0.28, SPAN * 0.18, SPAN * 0.10)
-        line(a, "Body", [sh, (sh + el) / 2 + V(0, 0.8, 0), el], [1.6, 1.1, 0.9], 7)
-        line(a, "Horns", [el, (el + wr) / 2 + V(0, 0.5, 0), wr], [0.8, 0.6, 0.55], 6)
-        a.add("Plates", *blob(el, normalize(el - sh), Y, Z, 1.3, 1.0, 1.0, 6, 3))
-        # pouce griffu
-        th = wr + V(sd * 1.2, 2.2, 1.8)
-        line(a, "Horns", [wr, th], [0.4, 0.25], 5)
-        a.add("Horns", *gem(th + V(0, -0.2, 0.8), normalize(V(0, -0.3, 1)), Y, X, 0.9, 0.2, 0.2))
+        # Bras : épaule musclée, avant-bras en os, plaques blindées et épines au coude et au poignet
+        a.add("Body", *blob(sh + V(sd * 2.0, 1.0, 0), normalize(el - sh), Y, Z, 3.6, 2.2, 2.0, 8, 4))
+        line(a, "Body", [sh, (sh + el) / 2 + V(0, 0.8, 0), el], [1.8, 1.3, 1.0], 8)
+        line(a, "Horns", [el, (el + wr) / 2 + V(0, 0.5, 0), wr], [0.9, 0.7, 0.6], 6)
+        a.add("Plates", *blob(el, normalize(el - sh), Y, Z, 1.5, 1.2, 1.2, 6, 3))
+        a.add("Plates", *blob(wr, normalize(wr - el), Y, Z, 1.0, 0.9, 0.9, 6, 3))
+        for k in range(3):                                   # plaques le long du haut du bras
+            q = sh + (el - sh) * (0.3 + 0.25 * k) + V(0, 1.3, 0)
+            a.add("Plates", *gem(q, normalize(el - sh), Y, Z, 1.6, 0.4, 0.9))
+        out = normalize(el - sh) * 0.5 + normalize(el - wr) * 0.5
+        a.add("Horns", *gem(el - normalize(out) * 0.0 + V(0, 0.2, -1.8), normalize(V(0, 0.2, -1)), Y, X, 2.2, 0.3, 0.3))
+        a.add("Horns", *gem(wr + V(sd * 0.3, 1.0, -1.2), normalize(V(sd * 0.2, 0.6, -1)), Y, X, 1.2, 0.2, 0.2))
+        # Pouce griffu
+        th = wr + V(sd * 1.2, 2.4, 2.0)
+        line(a, "Horns", [wr, (wr + th) / 2 + V(0, 0.4, 0), th], [0.5, 0.4, 0.3], 5)
+        a.add("Horns", *gem(th + V(0, -0.3, 0.9), normalize(V(0, -0.5, 1)), Y, X, 1.1, 0.22, 0.24))
         # 4 doigts en éventail, de l'avant (vers l'extérieur) à l'arrière (vers la queue)
-        tips = []
         fingers = []
         for k in range(4):
             t = k / 3
             tip = wr + V(sd * SPAN * (0.44 - 0.24 * t), -SPAN * (0.10 + 0.52 * t), -SPAN * (0.22 + 0.28 * t))
-            mid = (wr + tip) / 2 + V(sd * 0.6, 1.2, 0)
-            fpts = catmull_rom([wr, mid, tip], 12)
-            line(a, "Horns", [wr, mid, tip], [0.42, 0.3, 0.0], 5)
-            tips.append(tip)
-            fingers.append(fpts)
-        # dernier « doigt » : le flanc, du poignet jusqu'à la cuisse (la membrane s'y attache)
+            fingers.append(finger(a, wr, tip, sd, 0.62 - 0.08 * k))
+        arm = catmull_rom([wr, el, sh], 24)                      # bras, du poignet vers l'épaule
         root = V(sd * 3.6, 16.5, -8.0)
-        fingers.append(catmull_rom([el, (el + root) / 2 + V(0, -1.5, 0), root], 12))
-        fingers.insert(0, catmull_rom([sh, el, wr], 12))   # bord d'attaque (bras)
-        # Membrane : grille entre deux doigts voisins, creusée vers le bas au milieu
-        for fa, fb in zip(fingers[1:-1], fingers[2:]):
-            build_membrane(a, fa, fb, sd)
-        build_membrane(a, fingers[1], fingers[0], sd, sag=0.3)   # entre le premier doigt et le bras
-        build_membrane(a, fingers[-1], fingers[-2], sd)
+        flank = catmull_rom([wr, (wr + root) / 2 + V(sd * 2, -3.0, -2.0), root], 24)   # flanc : poignet -> cuisse
+        # Membranes : entre doigts voisins (bord festonné), puis entre le dernier doigt et le flanc
+        for fa, fb in zip(fingers[:-1], fingers[1:]):
+            build_membrane(a, fa, fb, scallop=0.22)
+        build_membrane(a, fingers[-1], flank, scallop=0.18)
+        build_membrane(a, arm, fingers[0], scallop=0.0, sag=0.25)   # entre le bras et le premier doigt
+        # Membrane avant (propatagium) : du cou au poignet, devant le bras
+        neck = catmull_rom([wr, (wr + sh) / 2 + V(0, -1.0, 1.5), V(sd * 3.0, 24.0, 5.0)], 24)
+        build_membrane(a, arm, neck, scallop=0.0, sag=0.2, rows=4)
         # Bord d'attaque lumineux
-        line(a, "Bolt", [p + V(0, 0.9, 0.2) for p in (sh, el, wr)], [0.22, 0.22, 0.18], 4)
-        # Nervures en éclairs le long des doigts, avec des branches
-        for fp in fingers[1:5]:
-            a0, a1 = fp[2], fp[-3]
-            pts = zigzag(a, "Bolt", a0 + V(0, 0.35, 0), a1 + V(0, 0.35, 0), 0.2, 0.08, n=6, amp=0.12)
-            for j in (2, 4):
-                br = pts[j] + normalize(np.cross(a1 - a0, Y)) * sd * 3.5 + V(0, 0.2, -1)
-                zigzag(a, "Bolt", pts[j], br, 0.12, 0.03, n=3, amp=0.3)
+        line(a, "Bolt", [p + V(0, 1.0, 0.3) for p in (sh, el, wr)], [0.24, 0.24, 0.2], 4)
+        # Nervures en éclairs entre les doigts, avec des branches
+        for fa, fb in zip(fingers[:-1], fingers[1:]):
+            a0, a1 = at(fa, 0.15) * 0.5 + at(fb, 0.15) * 0.5, at(fa, 0.7) * 0.5 + at(fb, 0.7) * 0.5
+            pts = zigzag(a, "Bolt", a0 + V(0, 0.3, 0), a1 + V(0, 0.3, 0), 0.2, 0.06, n=6, amp=0.1)
+            for jj in (2, 4):
+                br = at(fa, 0.15 + jj * 0.1) * 0.7 + at(fb, 0.15 + jj * 0.1) * 0.3 + V(0, 0.3, 0)
+                zigzag(a, "Bolt", pts[jj], br, 0.12, 0.03, n=3, amp=0.25)
 
 
-def build_membrane(a, fa, fb, sd, sag=1.0, rows=6):
-    """Surface entre deux doigts (mêmes nombres de points) ; le milieu se creuse vers le bas."""
+def build_membrane(a, fa, fb, sag=1.0, rows=7, scallop=0.0):
+    """Surface entre deux courbes partant du même point (le poignet). Le milieu se creuse vers le bas ; avec
+    scallop, le bord libre se creuse vers le poignet entre les deux doigts (bord festonné). Plus sombre le
+    long des os."""
     n = len(fa)
-    verts, faces = [], []
+    verts = []
     for i in range(n):
-        dist = np.linalg.norm(fa[i] - fb[i])
+        u = i / (n - 1)
         for j in range(rows + 1):
             t = j / rows
-            p = fa[i] * (1 - t) + fb[i] * t - Y * np.sin(np.pi * t) * dist * 0.08 * sag
-            verts.append(p)
+            uu = u * (1 - scallop * np.sin(np.pi * t) * u ** 2)
+            pa, pb = at(fa, uu), at(fb, uu)
+            dist = np.linalg.norm(pa - pb)
+            verts.append(pa * (1 - t) + pb * t - Y * np.sin(np.pi * t) * dist * 0.08 * sag)
+    faces, labels = [], []
     for i in range(n - 1):
         for j in range(rows):
             a0 = i * (rows + 1) + j
             b0 = a0 + rows + 1
             faces += [(a0, b0, b0 + 1), (a0, b0 + 1, a0 + 1)]
-    # Normale en chaque point de la grille (pour décaler les deux faces de la membrane)
+            edge = j == 0 or j == rows - 1 or i >= n - 3
+            labels += ["Membrane2" if edge else "Membrane"] * 2
     g = np.array(verts).reshape(n, rows + 1, 3)
-    du = np.gradient(g, axis=0)
-    dv = np.gradient(g, axis=1)
-    nrm = np.cross(du, dv).reshape(-1, 3)
+    nrm = np.cross(np.gradient(g, axis=0), np.gradient(g, axis=1)).reshape(-1, 3)
     nrm /= np.linalg.norm(nrm, axis=1, keepdims=True) + 1e-9
-    double_sided(a, "Membrane", np.array(verts), np.array(faces), nrm)
+    double_sided(a, "Membrane", np.array(verts), np.array(faces), nrm, labels=labels)
 
 
 def build():
@@ -315,12 +457,21 @@ def build():
     for name, color, mat in PARTS:
         a.part(name, color, mat)
     pts, T, N, B, rr = build_body(a)
+    build_scales(a, pts, rr)
+    build_belly_plates(a, pts, rr)
     build_back(a, pts, T, N, B, rr)
     build_tail(a, pts, T, N, B, rr)
+    # Trois têtes (hydre) : celle du milieu, plus grosse, et deux sur les cous de côté.
     m = mark(a)
-    build_head(a)
+    build_head(a, SPINE[-1][0], V(0, -0.12, 1))
     scale_since(a, m, SPINE[-1][0], 1.3)          # tête de boss : un peu plus grosse
-    a.head_center = (np.asarray(a.head_center) - SPINE[-1][0]) * 1.3 + SPINE[-1][0]
+    center = (np.asarray(a.head_center) - SPINE[-1][0]) * 1.3 + SPINE[-1][0]
+    for ctrl, look in SIDE_NECKS:
+        end = build_side_neck(a, ctrl)
+        m = mark(a)
+        build_head(a, end, look)
+        scale_since(a, m, end, 1.15)
+    a.head_center = center
     build_legs(a)
     build_wings(a)
     return a

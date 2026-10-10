@@ -1,0 +1,66 @@
+{
+  "name": "Wyverne_Tempete_v2",
+  "tris": 27748,
+  "size_studs": [
+    91.7,
+    43.9,
+    84.3
+  ],
+  "parts": {
+    "Body": {
+      "tris": 6988,
+      "color": "#1F2C52",
+      "material": "SmoothPlastic"
+    },
+    "Scales": {
+      "tris": 3080,
+      "color": "#2A3D72",
+      "material": "SmoothPlastic"
+    },
+    "Belly": {
+      "tris": 2212,
+      "color": "#3B4F86",
+      "material": "SmoothPlastic"
+    },
+    "Plates": {
+      "tris": 304,
+      "color": "#2E3C68",
+      "material": "SmoothPlastic"
+    },
+    "Membrane": {
+      "tris": 4536,
+      "color": "#2A3E7A",
+      "material": "SmoothPlastic"
+    },
+    "Membrane2": {
+      "tris": 2640,
+      "color": "#16204A",
+      "material": "SmoothPlastic"
+    },
+    "Horns": {
+      "tris": 4028,
+      "color": "#C9D6F0",
+      "material": "SmoothPlastic"
+    },
+    "Bolt": {
+      "tris": 3512,
+      "color": "#6FF2FF",
+      "material": "Neon"
+    },
+    "Bolt2": {
+      "tris": 392,
+      "color": "#FFF27A",
+      "material": "Neon"
+    },
+    "Eyes": {
+      "tris": 16,
+      "color": "#B8FBFF",
+      "material": "Neon"
+    },
+    "Mouth": {
+      "tris": 40,
+      "color": "#3A1030",
+      "material": "SmoothPlastic"
+    }
+  }
+}

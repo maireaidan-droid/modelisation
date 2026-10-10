@@ -101,10 +101,10 @@ body {
 <header class="card">
   <span class="badge">Boss</span>
   <h1>Wyverne des tempêtes</h1>
-  <p>Boss aérien électrique, version 1 (sans squelette pour l'instant). Glisser pour tourner, molette ou pincer pour zoomer.</p>
+  <p>Boss aérien électrique à trois têtes, version 3 (sans squelette pour l'instant). Glisser pour tourner, molette ou pincer pour zoomer.</p>
   <div class="facts">
-    <span><b>13 884</b> triangles</span>
-    <span><b>90</b> studs d'envergure</span>
+    <span><b>36 860</b> triangles</span>
+    <span><b>92</b> studs d'envergure</span>
     <span>le petit bonhomme blanc = un joueur</span>
   </div>
 </header>
@@ -234,7 +234,7 @@ body {
     status.hidden = true;
   }
   function onError() { status.textContent = "Le modèle n'a pas pu être chargé. Recharge la page pour réessayer."; }
-  fetch("wyverne_v1.txt")
+  fetch("wyverne_v3.txt")
     .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
     .then(function (b64) {
       const bin = atob(b64.trim());
