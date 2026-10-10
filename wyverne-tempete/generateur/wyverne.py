@@ -457,10 +457,13 @@ def build_wing(a, sd, sh, S, rise, back, root, front):
         fingers.append(finger(a, wr, tip, sd, (0.62 - 0.08 * k) * max(0.75, k_)))
     arm = catmull_rom([wr, el, sh], 24)                      # bras, du poignet vers l'épaule
     flank = catmull_rom([wr, (wr + root) / 2 + V(sd * 2, -3.0, -2.0) * k_, root], 24)   # flanc : poignet -> corps
+    # Membrane d'un seul tenant : entre doigts voisins (bord à peine festonné), entre le dernier doigt et
+    # le flanc, entre le bras et le premier doigt, et entre le bras et le flanc (le triangle près du corps).
     for fa, fb in zip(fingers[:-1], fingers[1:]):
-        build_membrane(a, fa, fb, scallop=0.12)
-    build_membrane(a, fingers[-1], flank, scallop=0.08)
-    build_membrane(a, arm, fingers[0], scallop=0.0, sag=0.25)   # entre le bras et le premier doigt
+        build_membrane(a, fa, fb, scallop=0.06)
+    build_membrane(a, fingers[-1], flank, scallop=0.04)
+    build_membrane(a, arm, fingers[0], scallop=0.0, sag=0.25)
+    build_membrane(a, arm, flank, scallop=0.0, sag=0.15)
     if front is not None:                                        # membrane avant : du corps au poignet
         fr = catmull_rom([wr, (wr + sh) / 2 + V(0, -1.0, 1.5) * k_, front], 24)
         build_membrane(a, arm, fr, scallop=0.0, sag=0.2, rows=4)

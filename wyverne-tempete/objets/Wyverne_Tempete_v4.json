@@ -1,6 +1,6 @@
 {
   "name": "Wyverne_Tempete_v4",
-  "tris": 50348,
+  "tris": 52924,
   "size_studs": [
     94.7,
     44.9,
@@ -28,12 +28,12 @@
       "material": "SmoothPlastic"
     },
     "Membrane": {
-      "tris": 9072,
+      "tris": 10752,
       "color": "#2A3E7A",
       "material": "SmoothPlastic"
     },
     "Membrane2": {
-      "tris": 5280,
+      "tris": 6176,
       "color": "#16204A",
       "material": "SmoothPlastic"
     },
