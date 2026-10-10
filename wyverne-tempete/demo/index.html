@@ -1,0 +1,291 @@
+<title>Wyverne des tempêtes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Nunito+Sans:wght@400;600;700&display=swap">
+<style>
+/* Plein écran : la wyverne au centre dans un ciel d'orage, carte d'identité en haut à gauche, commandes en bas. */
+:root {
+  color-scheme: dark;
+  --bg: #070a14;
+  --bg-glow: #142042;
+  --ink: #eaf3ff;
+  --muted: #9fb2cf;
+  --cyan: #6ff2ff;
+  --yellow: #fff27a;
+  --panel: rgba(10, 16, 32, 0.78);
+  --line: rgba(111, 242, 255, 0.28);
+  --display: "Cinzel", "Trajan Pro", Georgia, serif;
+  --body: "Nunito Sans", "Segoe UI", system-ui, sans-serif;
+}
+:root[data-theme="light"] { color-scheme: dark; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: radial-gradient(120% 90% at 50% 35%, var(--bg-glow), var(--bg) 70%);
+  color: var(--ink);
+  font-family: var(--body);
+  overflow: hidden;
+}
+#stage { position: fixed; inset: 0; }
+#stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+#flash { position: fixed; inset: 0; pointer-events: none; background: #cfe9ff; opacity: 0; }
+
+.card {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  left: 16px;
+  max-width: min(440px, calc(100% - 32px));
+  display: grid;
+  gap: 6px;
+  pointer-events: none;
+}
+.badge {
+  justify-self: start;
+  font: 800 11px/1 var(--body);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #06121c;
+  background: var(--cyan);
+  padding: 5px 9px;
+  border-radius: 999px;
+}
+.card h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(26px, 5vw, 40px);
+  letter-spacing: 0.06em;
+  color: var(--cyan);
+  text-shadow: 0 0 18px rgba(111, 242, 255, 0.45);
+  text-wrap: balance;
+}
+.card p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.45; }
+.facts { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.facts b { color: var(--ink); font-weight: 700; }
+
+.controls {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  max-width: calc(100% - 32px);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  backdrop-filter: blur(6px);
+}
+.controls button {
+  font: 700 13px/1 var(--body);
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 14px;
+  min-height: 40px;
+  cursor: pointer;
+}
+.controls button:hover { background: rgba(111, 242, 255, 0.12); }
+.controls button[aria-pressed="true"] { background: var(--cyan); color: #06121c; }
+.controls button:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+#status { position: fixed; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 15px; text-align: center; padding: 16px; }
+#status[hidden] { display: none; }
+@media (max-width: 600px) { .card p { display: none; } .controls button { padding: 10px 11px; } }
+</style>
+
+<div id="stage"></div>
+<div id="flash" aria-hidden="true"></div>
+
+<header class="card">
+  <span class="badge">Boss</span>
+  <h1>Wyverne des tempêtes</h1>
+  <p>Boss aérien électrique, version 1 (sans squelette pour l'instant). Glisser pour tourner, molette ou pincer pour zoomer.</p>
+  <div class="facts">
+    <span><b>13 884</b> triangles</span>
+    <span><b>90</b> studs d'envergure</span>
+    <span>le petit bonhomme blanc = un joueur</span>
+  </div>
+</header>
+
+<div id="status">Chargement de la wyverne…</div>
+
+<nav class="controls" aria-label="Commandes">
+  <button id="btn-spin" aria-pressed="true">Rotation</button>
+  <button id="btn-storm" aria-pressed="true">Orage</button>
+  <button data-view="trois">Trois-quarts</button>
+  <button data-view="face">Face</button>
+  <button data-view="profil">Profil</button>
+  <button data-view="tete">Tête</button>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function () {
+  const stage = document.getElementById("stage");
+  const status = document.getElementById("status");
+  const flash = document.getElementById("flash");
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.1;
+  stage.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x070a14, 160, 320);
+  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 800);
+
+  // Lumière d'orage : ciel froid, lumière principale bleutée, contre-jour cyan ; un éclair blanc de temps en temps.
+  scene.add(new THREE.HemisphereLight(0xbfd6ff, 0x0b0f1c, 0.9));
+  const key = new THREE.DirectionalLight(0xd6e6ff, 1.4);
+  key.position.set(40, 70, 60);
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0x6ff2ff, 0.9);
+  rim.position.set(-50, 30, -60);
+  scene.add(rim);
+  const strike = new THREE.PointLight(0xcfe9ff, 0, 400);
+  strike.position.set(-30, 90, 20);
+  scene.add(strike);
+
+  // Socle : disque sombre et anneau cyan.
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(70, 72),
+    new THREE.MeshBasicMaterial({ color: 0x05070e, transparent: true, opacity: 0.7 }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.05;
+  scene.add(ground);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(69, 70, 120),
+    new THREE.MeshBasicMaterial({ color: 0x6ff2ff, transparent: true, opacity: 0.25 }));
+  ring.rotation.x = -Math.PI / 2;
+  scene.add(ring);
+
+  // Silhouette d'un joueur Roblox (5 studs) pour l'échelle.
+  const player = new THREE.Group();
+  const white = new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.8 });
+  [[0, 3, 0, 2, 2, 1], [0, 4.5, 0, 1.1, 1, 1.1], [-0.5, 1, 0, 0.95, 2, 1], [0.5, 1, 0, 0.95, 2, 1],
+   [-1.5, 3, 0, 0.95, 2, 1], [1.5, 3, 0, 0.95, 2, 1]].forEach(function (b) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(b[3], b[4], b[5]), white);
+    m.position.set(b[0], b[1], b[2]);
+    player.add(m);
+  });
+  player.position.set(22, 0, 26);
+  scene.add(player);
+
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.minDistance = 12;
+  controls.maxDistance = 260;
+  controls.maxPolarAngle = Math.PI * 0.62;
+
+  const pivot = new THREE.Group();
+  scene.add(pivot);
+
+  const VIEWS = {
+    trois:  { pos: [95, 55, 105], target: [0, 20, 0] },
+    face:   { pos: [0, 30, 135], target: [0, 22, 0] },
+    profil: { pos: [135, 25, 0], target: [0, 20, 0] },
+    tete:   { pos: [34, 44, 66], target: [0, 32, 20] }
+  };
+  let tween = null;
+  function goTo(name) {
+    const v = VIEWS[name];
+    const to = { pos: new THREE.Vector3().fromArray(v.pos), target: new THREE.Vector3().fromArray(v.target) };
+    if (reduceMotion) { camera.position.copy(to.pos); controls.target.copy(to.target); return; }
+    tween = { t: 0, from: { pos: camera.position.clone(), target: controls.target.clone() }, to: to };
+  }
+  camera.position.fromArray(VIEWS.trois.pos);
+  controls.target.fromArray(VIEWS.trois.target);
+
+  function resize() {
+    const w = stage.clientWidth, h = stage.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.fov = w < 600 ? 55 : 38;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  // Éclairs du modèle (parties Bolt / Bolt2 / Eyes, en Neon) : ils crépitent, chacun à son rythme.
+  const bolts = [];
+  function onModel(gltf) {
+    gltf.scene.traverse(function (o) {
+      if (!o.isMesh) return;
+      const m = o.material.clone();
+      o.material = m;
+      m.color.convertSRGBToLinear();
+      m.flatShading = true;
+      o.frustumCulled = false;
+      if (o.name.indexOf("Membrane") === 0) m.side = THREE.DoubleSide;
+      if (/^(Bolt|Eyes)/.test(o.name)) {
+        // Néon : couleur pure, insensible à l'éclairage (comme le matériau Neon de Roblox).
+        const neon = new THREE.MeshBasicMaterial({ color: m.color.clone(), toneMapped: false });
+        o.material = neon;
+        bolts.push({ m: neon, color: m.color.clone(), seed: Math.random() * 100 });
+      }
+    });
+    pivot.add(gltf.scene);
+    status.hidden = true;
+  }
+  function onError() { status.textContent = "Le modèle n'a pas pu être chargé. Recharge la page pour réessayer."; }
+  fetch("wyverne_v1.txt")
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+    .then(function (b64) {
+      const bin = atob(b64.trim());
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      new THREE.GLTFLoader().parse(bytes.buffer, "", onModel, onError);
+    })
+    .catch(onError);
+
+  // Commandes
+  let spin = !reduceMotion, storm = !reduceMotion;
+  const btnSpin = document.getElementById("btn-spin"), btnStorm = document.getElementById("btn-storm");
+  btnSpin.setAttribute("aria-pressed", String(spin));
+  btnStorm.setAttribute("aria-pressed", String(storm));
+  btnSpin.addEventListener("click", function () { spin = !spin; btnSpin.setAttribute("aria-pressed", String(spin)); });
+  btnStorm.addEventListener("click", function () { storm = !storm; btnStorm.setAttribute("aria-pressed", String(storm)); });
+  document.querySelectorAll("[data-view]").forEach(function (b) {
+    b.addEventListener("click", function () { goTo(b.dataset.view); });
+  });
+  controls.addEventListener("start", function () { tween = null; });
+
+  const clock = new THREE.Clock();
+  let nextStrike = 3, strikeT = 9;
+  function loop() {
+    const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+    if (spin) pivot.rotation.y += dt * 0.18;
+    // Crépitement : chaque éclair varie vite et irrégulièrement ; un vrai coup de foudre de temps en temps.
+    if (storm) {
+      nextStrike -= dt;
+      if (nextStrike <= 0) { strikeT = 0; nextStrike = 4 + Math.random() * 5; }
+    }
+    strikeT += dt;
+    const s = strikeT < 0.45 ? Math.max(0, Math.sin(strikeT * 40)) * (1 - strikeT / 0.45) : 0;
+    strike.intensity = 6 * s;
+    flash.style.opacity = String(0.18 * s);
+    bolts.forEach(function (b) {
+      const n = storm ? 0.7 + 0.3 * Math.sin(t * 23 + b.seed) * Math.sin(t * 7.3 + b.seed * 2)
+                      + (Math.random() < 0.02 ? 0.4 : 0) : 1;
+      b.m.color.copy(b.color).multiplyScalar(Math.min(1.3, n + 0.4 * s));
+    });
+    if (tween) {
+      tween.t = Math.min(1, tween.t + dt / 1.1);
+      const e = tween.t < 0.5 ? 4 * tween.t * tween.t * tween.t : 1 - Math.pow(-2 * tween.t + 2, 3) / 2;
+      camera.position.lerpVectors(tween.from.pos, tween.to.pos, e);
+      controls.target.lerpVectors(tween.from.target, tween.to.target, e);
+      if (tween.t >= 1) tween = null;
+    }
+    controls.update();
+    renderer.render(scene, camera);
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+</script>
