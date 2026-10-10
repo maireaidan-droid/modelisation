@@ -10,7 +10,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "dragon-long", "generateur"))
 from meshlib import Asset, catmull_rom, frames, loft, ellipse_ring, tube, blob, fin, gem, normalize  # noqa: E402
 
-VERSION = "v3"
+VERSION = "v4"
 X, Y, Z = np.eye(3)
 rng = np.random.default_rng(21)
 
@@ -286,16 +286,52 @@ def build_head(a, base, f):
 
 # Hydre : deux cous de plus, qui partent du poitrail de chaque côté du cou principal et s'écartent.
 SIDE_NECKS = [
-    # (points du cou, du poitrail vers la tête), direction du regard
-    ([V(2.4, 18.5, 6.0), V(6.5, 20.0, 8.5), V(11.0, 22.0, 10.0), V(14.5, 24.0, 12.0)], V(0.5, -0.12, 1)),
+    # (points du cou, du poitrail vers la tête), direction du regard. Le premier point est dans le buste.
+    ([V(2.8, 20.5, 5.5), V(6.0, 24.0, 7.5), V(9.0, 27.5, 9.5), V(11.0, 29.0, 12.5)], V(0.38, -0.15, 1)),
 ]
+CHEST = V(0, 20.5, 5.5)          # centre du buste élargi d'où sortent les trois cous
+
+
+def build_chest(a):
+    """Buste élargi (une large épaule de chaque côté du cou principal) : les trois cous en sortent comme d'un
+    même tronc. Couvert d'écailles en tuiles, plaques du poitrail dessous, muscles à la base de chaque cou."""
+    rf, ru, rs = 5.2, 4.4, 7.6
+    a.add("Body", *blob(CHEST, Z, Y, X, rf, ru, rs, 14, 7))
+    # écailles en tuiles sur le dessus et les côtés de l'ellipsoïde, en quinconce
+    for row, el in enumerate(np.linspace(-0.25, 1.25, 9)):
+        nb = max(4, int(round(16 * np.cos(el) + 4)))
+        for j in range(nb):
+            az = (j + 0.5 * (row % 2)) / nb * 2 * np.pi
+            d = V(np.cos(el) * np.sin(az), np.sin(el), np.cos(el) * np.cos(az))
+            c = CHEST + V(d[0] * rs, d[1] * ru, d[2] * rf)
+            o = normalize(V(d[0] / rs, d[1] / ru, d[2] / rf))
+            if o[2] > 0.75:                                   # devant : laissé aux plaques du poitrail
+                continue
+            t = normalize(np.cross(o, normalize(np.cross(V(0, 0, -1), o)) if abs(o[2]) < 0.99 else X))
+            t = normalize(V(0, -0.3, -1) - o * (V(0, -0.3, -1) @ o))   # pointe vers l'arrière et le bas
+            x = normalize(np.cross(o, t))
+            L, W = 1.7, 1.5
+            base = [c + t * np.cos(2 * np.pi * k / 5) * L * (0.6 if np.cos(2 * np.pi * k / 5) > 0 else 0.45)
+                    + x * np.sin(2 * np.pi * k / 5) * W / 2 - o * 0.08 * (np.cos(2 * np.pi * k / 5) < 0)
+                    for k in range(5)]
+            a.add("Scales" if row % 2 else "Body", base + [c + o * 0.18],
+                  [(k, (k + 1) % 5, 5) for k in range(5)] + [(0, 2, 1), (0, 3, 2), (0, 4, 3)])
+    # plaques du poitrail, en bandes horizontales sous les cous
+    for k in range(5):
+        y = CHEST[1] - 2.8 + k * 1.3
+        w = rs * 0.75 * np.sqrt(max(0.1, 1 - ((y - CHEST[1]) / ru) ** 2))
+        a.add("Belly", *gem(V(0, y, CHEST[2] + rf * 0.86 * np.sqrt(max(0.1, 1 - ((y - CHEST[1]) / ru) ** 2))),
+                            Z, Y, X, 0.5, 0.55, w))
+    # muscles à la base des cous de côté
+    for sd in (1, -1):
+        a.add("Body", *blob(V(sd * 4.4, 22.5, 6.8), normalize(V(sd * 0.6, 0.6, 0.4)), Y, Z, 3.2, 2.6, 2.4, 8, 4))
 SIDE_NECKS.append(([p * V(-1, 1, 1) for p in SIDE_NECKS[0][0]], SIDE_NECKS[0][1] * V(-1, 1, 1)))
 
 
 def build_side_neck(a, ctrl):
     """Cou d'une tête d'hydre : écailles en tuiles sur le dessus, plaques de ventre dessous, crête d'éclairs."""
     pts = catmull_rom(ctrl, 40)
-    rr = np.interp(np.linspace(0, 1, len(pts)), [0, 0.3, 1], [3.0, 2.3, 1.9])
+    rr = np.interp(np.linspace(0, 1, len(pts)), [0, 0.25, 1], [3.4, 2.5, 1.9])
     T, N, B = frames(pts, Y)
     rings = [np.array([p + (b * np.cos(x) * 1.05 + n * np.sin(x) * 0.95) * r
                        for x in np.pi / 2 + np.arange(10) * 2 * np.pi / 10]) for p, n, b, r in zip(pts, N, B, rr)]
@@ -315,7 +351,7 @@ def build_side_neck(a, ctrl):
                   [(k, (k + 1) % 5, 5) for k in range(5)] + [(0, 2, 1), (0, 3, 2), (0, 4, 3)])
         if i % 2 == 0:                                       # plaques de ventre
             a.add("Belly", *gem(pts[i] - n * r * 0.85, t, n, b, 0.9, 0.3, r * 0.75))
-        if i % 4 == 1:                                       # crête d'éclairs
+        if i % 6 == 1:                                       # crête d'éclairs
             q = pts[i] + n * r * 1.05
             zigzag(a, "Bolt", q, q + n * 2.2 - t * 1.3, 0.26, 0.05, n=3, amp=0.35, normal=b)
     return pts[-1]
@@ -370,58 +406,72 @@ def finger(a, wr, tip, sd, r0):
     return pts
 
 
+# Deux paires d'ailes : la grande devant (aux épaules) et une plus petite au milieu du dos, plus basse et
+# balayée vers l'arrière, pour que les deux ne se croisent pas.
+# (épaule, envergure, montée, recul, attache arrière de la membrane sur le flanc, attache avant ou None)
+WINGS = [
+    (V(4.0, 23.0, 2.0), 40.0, 1.0, 0.0, V(4.2, 19.5, -6.5), V(4.2, 24.0, 3.0)),
+    (V(3.8, 19.5, -10.0), 28.0, 0.55, 0.16, V(3.6, 15.0, -19.0), V(4.2, 19.8, -6.0)),
+]
+
+
 def build_wings(a):
-    """Ailes de chauve-souris immenses :
+    for sh, S, rise, back, root, front in WINGS:
+        for sd in (1, -1):
+            m = V(sd, 1, 1)
+            build_wing(a, sd, sh * m, S, rise, back, root * m, front * m if front is not None else None)
+
+
+def build_wing(a, sd, sh, S, rise, back, root, front):
+    """Aile de chauve-souris :
     - bras épais (épaule, coude, poignet) avec plaques et épines, pouce griffu ;
     - 4 doigts à phalanges, articulations et griffes ;
-    - membrane avant (du cou au poignet), membrane entre les doigts au bord festonné, membrane du flanc ;
-    - membrane en deux tons (plus sombre le long des os), bord d'attaque lumineux, nervures en éclairs."""
-    for sd in (1, -1):
-        sh = V(sd * 3.4, 22.0, 3.0)
-        el = sh + V(sd * SPAN * 0.32, SPAN * 0.30, -SPAN * 0.06)
-        wr = el + V(sd * SPAN * 0.28, SPAN * 0.18, SPAN * 0.10)
-        # Bras : épaule musclée, avant-bras en os, plaques blindées et épines au coude et au poignet
-        a.add("Body", *blob(sh + V(sd * 2.0, 1.0, 0), normalize(el - sh), Y, Z, 3.6, 2.2, 2.0, 8, 4))
-        line(a, "Body", [sh, (sh + el) / 2 + V(0, 0.8, 0), el], [1.8, 1.3, 1.0], 8)
-        line(a, "Horns", [el, (el + wr) / 2 + V(0, 0.5, 0), wr], [0.9, 0.7, 0.6], 6)
-        a.add("Plates", *blob(el, normalize(el - sh), Y, Z, 1.5, 1.2, 1.2, 6, 3))
-        a.add("Plates", *blob(wr, normalize(wr - el), Y, Z, 1.0, 0.9, 0.9, 6, 3))
-        for k in range(3):                                   # plaques le long du haut du bras
-            q = sh + (el - sh) * (0.3 + 0.25 * k) + V(0, 1.3, 0)
-            a.add("Plates", *gem(q, normalize(el - sh), Y, Z, 1.6, 0.4, 0.9))
-        out = normalize(el - sh) * 0.5 + normalize(el - wr) * 0.5
-        a.add("Horns", *gem(el - normalize(out) * 0.0 + V(0, 0.2, -1.8), normalize(V(0, 0.2, -1)), Y, X, 2.2, 0.3, 0.3))
-        a.add("Horns", *gem(wr + V(sd * 0.3, 1.0, -1.2), normalize(V(sd * 0.2, 0.6, -1)), Y, X, 1.2, 0.2, 0.2))
-        # Pouce griffu
-        th = wr + V(sd * 1.2, 2.4, 2.0)
-        line(a, "Horns", [wr, (wr + th) / 2 + V(0, 0.4, 0), th], [0.5, 0.4, 0.3], 5)
-        a.add("Horns", *gem(th + V(0, -0.3, 0.9), normalize(V(0, -0.5, 1)), Y, X, 1.1, 0.22, 0.24))
-        # 4 doigts en éventail, de l'avant (vers l'extérieur) à l'arrière (vers la queue)
-        fingers = []
-        for k in range(4):
-            t = k / 3
-            tip = wr + V(sd * SPAN * (0.44 - 0.24 * t), -SPAN * (0.10 + 0.52 * t), -SPAN * (0.22 + 0.28 * t))
-            fingers.append(finger(a, wr, tip, sd, 0.62 - 0.08 * k))
-        arm = catmull_rom([wr, el, sh], 24)                      # bras, du poignet vers l'épaule
-        root = V(sd * 3.6, 16.5, -8.0)
-        flank = catmull_rom([wr, (wr + root) / 2 + V(sd * 2, -3.0, -2.0), root], 24)   # flanc : poignet -> cuisse
-        # Membranes : entre doigts voisins (bord festonné), puis entre le dernier doigt et le flanc
-        for fa, fb in zip(fingers[:-1], fingers[1:]):
-            build_membrane(a, fa, fb, scallop=0.22)
-        build_membrane(a, fingers[-1], flank, scallop=0.18)
-        build_membrane(a, arm, fingers[0], scallop=0.0, sag=0.25)   # entre le bras et le premier doigt
-        # Membrane avant (propatagium) : du cou au poignet, devant le bras
-        neck = catmull_rom([wr, (wr + sh) / 2 + V(0, -1.0, 1.5), V(sd * 3.0, 24.0, 5.0)], 24)
-        build_membrane(a, arm, neck, scallop=0.0, sag=0.2, rows=4)
-        # Bord d'attaque lumineux
-        line(a, "Bolt", [p + V(0, 1.0, 0.3) for p in (sh, el, wr)], [0.24, 0.24, 0.2], 4)
-        # Nervures en éclairs entre les doigts, avec des branches
-        for fa, fb in zip(fingers[:-1], fingers[1:]):
-            a0, a1 = at(fa, 0.15) * 0.5 + at(fb, 0.15) * 0.5, at(fa, 0.7) * 0.5 + at(fb, 0.7) * 0.5
-            pts = zigzag(a, "Bolt", a0 + V(0, 0.3, 0), a1 + V(0, 0.3, 0), 0.2, 0.06, n=6, amp=0.1)
-            for jj in (2, 4):
-                br = at(fa, 0.15 + jj * 0.1) * 0.7 + at(fb, 0.15 + jj * 0.1) * 0.3 + V(0, 0.3, 0)
-                zigzag(a, "Bolt", pts[jj], br, 0.12, 0.03, n=3, amp=0.25)
+    - membrane avant, membrane entre les doigts au bord festonné, membrane du flanc ;
+    - membrane en deux tons (plus sombre le long des os), bord d'attaque lumineux, nervures en éclairs.
+    rise < 1 : aile plus basse ; back : aile balayée vers l'arrière."""
+    k_ = S / 40.0                                             # épaisseur des os selon la taille de l'aile
+    el = sh + V(sd * S * 0.32, S * 0.30 * rise, -S * 0.06 - S * back)
+    wr = el + V(sd * S * 0.28, S * 0.18 * rise, S * 0.10 - S * back)
+    # Bras : épaule musclée, avant-bras en os, plaques blindées et épines au coude et au poignet
+    a.add("Body", *blob(sh + V(sd * 2.0, 1.0, 0) * k_, normalize(el - sh), Y, Z, 3.6 * k_, 2.2 * k_, 2.0 * k_, 8, 4))
+    line(a, "Body", [sh, (sh + el) / 2 + V(0, 0.8, 0), el], [1.8 * k_, 1.3 * k_, 1.0 * k_], 8)
+    line(a, "Horns", [el, (el + wr) / 2 + V(0, 0.5, 0), wr], [0.9 * k_, 0.7 * k_, 0.6 * k_], 6)
+    a.add("Plates", *blob(el, normalize(el - sh), Y, Z, 1.5 * k_, 1.2 * k_, 1.2 * k_, 6, 3))
+    a.add("Plates", *blob(wr, normalize(wr - el), Y, Z, 1.0 * k_, 0.9 * k_, 0.9 * k_, 6, 3))
+    for k in range(3):                                       # plaques le long du haut du bras
+        q = sh + (el - sh) * (0.3 + 0.25 * k) + V(0, 1.3 * k_, 0)
+        a.add("Plates", *gem(q, normalize(el - sh), Y, Z, 1.6 * k_, 0.4 * k_, 0.9 * k_))
+    a.add("Horns", *gem(el + V(0, 0.2, -1.8 * k_), normalize(V(0, 0.2, -1)), Y, X, 2.2 * k_, 0.3, 0.3))
+    a.add("Horns", *gem(wr + V(sd * 0.3, 1.0, -1.2) * k_, normalize(V(sd * 0.2, 0.6, -1)), Y, X, 1.2 * k_, 0.2, 0.2))
+    # Pouce griffu
+    th = wr + V(sd * 1.2, 2.4, 2.0) * k_
+    line(a, "Horns", [wr, (wr + th) / 2 + V(0, 0.4, 0) * k_, th], [0.5 * k_, 0.4 * k_, 0.3 * k_], 5)
+    a.add("Horns", *gem(th + V(0, -0.3, 0.9) * k_, normalize(V(0, -0.5, 1)), Y, X, 1.1 * k_, 0.22, 0.24))
+    # 4 doigts en éventail, de l'avant (vers l'extérieur) à l'arrière (vers la queue)
+    fingers = []
+    for k in range(4):
+        t = k / 3
+        tip = wr + V(sd * S * (0.44 - 0.24 * t), -S * (0.10 + 0.52 * t) * (0.6 + 0.4 * rise),
+                     -S * (0.22 + 0.28 * t) - S * back * 0.5)
+        fingers.append(finger(a, wr, tip, sd, (0.62 - 0.08 * k) * max(0.75, k_)))
+    arm = catmull_rom([wr, el, sh], 24)                      # bras, du poignet vers l'épaule
+    flank = catmull_rom([wr, (wr + root) / 2 + V(sd * 2, -3.0, -2.0) * k_, root], 24)   # flanc : poignet -> corps
+    for fa, fb in zip(fingers[:-1], fingers[1:]):
+        build_membrane(a, fa, fb, scallop=0.22)
+    build_membrane(a, fingers[-1], flank, scallop=0.18)
+    build_membrane(a, arm, fingers[0], scallop=0.0, sag=0.25)   # entre le bras et le premier doigt
+    if front is not None:                                        # membrane avant : du corps au poignet
+        fr = catmull_rom([wr, (wr + sh) / 2 + V(0, -1.0, 1.5) * k_, front], 24)
+        build_membrane(a, arm, fr, scallop=0.0, sag=0.2, rows=4)
+    # Bord d'attaque lumineux
+    line(a, "Bolt", [p + V(0, 1.0, 0.3) * k_ for p in (sh, el, wr)], [0.24, 0.24, 0.2], 4)
+    # Nervures en éclairs entre les doigts, avec des branches
+    for fa, fb in zip(fingers[:-1], fingers[1:]):
+        a0, a1 = at(fa, 0.15) * 0.5 + at(fb, 0.15) * 0.5, at(fa, 0.7) * 0.5 + at(fb, 0.7) * 0.5
+        pts = zigzag(a, "Bolt", a0 + V(0, 0.3, 0), a1 + V(0, 0.3, 0), 0.2, 0.06, n=6, amp=0.1)
+        for jj in (2, 4):
+            br = at(fa, 0.15 + jj * 0.1) * 0.7 + at(fb, 0.15 + jj * 0.1) * 0.3 + V(0, 0.3, 0)
+            zigzag(a, "Bolt", pts[jj], br, 0.12, 0.03, n=3, amp=0.25)
 
 
 def build_membrane(a, fa, fb, sag=1.0, rows=7, scallop=0.0):
@@ -459,6 +509,7 @@ def build():
     pts, T, N, B, rr = build_body(a)
     build_scales(a, pts, rr)
     build_belly_plates(a, pts, rr)
+    build_chest(a)
     build_back(a, pts, T, N, B, rr)
     build_tail(a, pts, T, N, B, rr)
     # Trois têtes (hydre) : celle du milieu, plus grosse, et deux sur les cous de côté.
