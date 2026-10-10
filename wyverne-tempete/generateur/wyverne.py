@@ -451,14 +451,15 @@ def build_wing(a, sd, sh, S, rise, back, root, front):
     fingers = []
     for k in range(4):
         t = k / 3
-        tip = wr + V(sd * S * (0.44 - 0.24 * t), -S * (0.10 + 0.52 * t) * (0.6 + 0.4 * rise),
-                     -S * (0.22 + 0.28 * t) - S * back * 0.5)
+        # Doigts en éventail régulier : l'aile reste une seule grande surface, peu plongeante.
+        tip = wr + V(sd * S * (0.46 - 0.30 * t), -S * (0.06 + 0.36 * t) * (0.6 + 0.4 * rise),
+                     -S * (0.18 + 0.36 * t) - S * back * 0.5)
         fingers.append(finger(a, wr, tip, sd, (0.62 - 0.08 * k) * max(0.75, k_)))
     arm = catmull_rom([wr, el, sh], 24)                      # bras, du poignet vers l'épaule
     flank = catmull_rom([wr, (wr + root) / 2 + V(sd * 2, -3.0, -2.0) * k_, root], 24)   # flanc : poignet -> corps
     for fa, fb in zip(fingers[:-1], fingers[1:]):
-        build_membrane(a, fa, fb, scallop=0.22)
-    build_membrane(a, fingers[-1], flank, scallop=0.18)
+        build_membrane(a, fa, fb, scallop=0.12)
+    build_membrane(a, fingers[-1], flank, scallop=0.08)
     build_membrane(a, arm, fingers[0], scallop=0.0, sag=0.25)   # entre le bras et le premier doigt
     if front is not None:                                        # membrane avant : du corps au poignet
         fr = catmull_rom([wr, (wr + sh) / 2 + V(0, -1.0, 1.5) * k_, front], 24)
